@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Alert,
   Platform,
   Animated,
@@ -29,18 +28,9 @@ import LockedOverlay from '@/components/ui/LockedOverlay';
 import { TESTS, TestDefinition, TestResult } from '@/mocks/tests';
 import { useApp } from '@/context/AppContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - spacing.xl * 2 - spacing.md) / 2;
-
 type ScreenState = 'list' | 'quiz' | 'result';
 
-const DIFFICULTY_MAP: Record<string, number> = {
-  '3 min': 1,
-  '4 min': 2,
-  '5 min': 3,
-  '6 min': 3,
-};
-
+const DIFFICULTY_MAP: Record<string, number> = { '3 min': 1, '4 min': 2, '5 min': 3, '6 min': 3 };
 const DIFFICULTY_COLORS = ['#4ECDC4', '#FFD166', '#FF6B8A'];
 
 function createStyles(c: ThemeColors, s: ThemeShadows) {
@@ -50,19 +40,20 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
     headerSub: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const, marginTop: spacing.xs },
     listContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
-    featuredCard: { padding: spacing.xl, marginBottom: spacing.xl, minHeight: 160, justifyContent: 'center' as const, gap: spacing.sm },
+    featuredCard: { padding: spacing.xl, marginBottom: spacing.lg, minHeight: 130, justifyContent: 'center' as const, gap: spacing.sm },
     featuredTitle: { fontSize: fontSizes.xl, color: c.text_primary, fontWeight: '700' as const },
     featuredDetail: { fontSize: fontSizes.sm, color: c.text_secondary },
     featuredCta: { alignSelf: 'flex-start' as const, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
-    testGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.md },
-    testCard: { width: CARD_WIDTH, padding: spacing.lg, gap: spacing.sm },
-    testIconContainer: { marginBottom: spacing.xs },
-    testIconGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center' as const, justifyContent: 'center' as const },
+    testRow: { padding: spacing.md, paddingHorizontal: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md, marginBottom: spacing.sm },
+    testIconGradient: { width: 40, height: 40, borderRadius: 12, alignItems: 'center' as const, justifyContent: 'center' as const },
+    testInfo: { flex: 1 },
     testTitle: { fontSize: fontSizes.base, color: c.text_primary, fontWeight: '600' as const },
-    testDesc: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 18 },
-    testFooter: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, marginTop: spacing.xs },
+    testDesc: { fontSize: fontSizes.xs, color: c.text_secondary, marginTop: 2 },
+    testRight: { alignItems: 'flex-end' as const, gap: spacing.xs },
     difficultyDots: { flexDirection: 'row' as const, gap: 3 },
-    difficultyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.glass_border },
+    difficultyDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: c.glass_border },
+    completedBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
+    completedText: { fontSize: fontSizes.xs, color: c.success },
     quizHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.md },
     backBtn: { padding: spacing.xs },
     quizProgress: { fontSize: fontSizes.xs, color: c.text_muted, letterSpacing: 1.5, textTransform: 'uppercase' as const },
@@ -86,8 +77,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     reportPreview: { color: c.text_secondary, fontSize: fontSizes.base, lineHeight: 24, padding: spacing.xl },
     resultActions: { gap: spacing.md, alignItems: 'center' as const, width: '100%' },
     bottomSpacer: { height: 40 },
-    completedBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, marginTop: spacing.xs },
-    completedText: { fontSize: fontSizes.xs, color: c.success },
+    sectionLabel: { fontSize: fontSizes.xs, color: c.text_muted, fontWeight: '600' as const, letterSpacing: 1.2, textTransform: 'uppercase' as const, marginBottom: spacing.sm, marginTop: spacing.lg },
   });
 }
 
@@ -108,7 +98,7 @@ export default function TestsScreen() {
   const resultOpacityAnim = useRef(new Animated.Value(0)).current;
 
   const startTest = useCallback((test: TestDefinition) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setActiveTest(test);
     setCurrentQuestion(0);
     setAnswers({});
@@ -117,13 +107,13 @@ export default function TestsScreen() {
   }, []);
 
   const handleAnswer = useCallback((answerId: string) => {
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     setSelectedAnswer(answerId);
   }, []);
 
   const handleNext = useCallback(() => {
     if (!activeTest || !selectedAnswer) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const question = activeTest.questions[currentQuestion];
     const answer = question.answers.find(a => a.id === selectedAnswer);
     if (!answer) return;
@@ -143,8 +133,7 @@ export default function TestsScreen() {
       setScreenState('result');
       setCompletedTestIds(prev => prev.includes(activeTest.id) ? prev : [...prev, activeTest.id]);
       incrementTests();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       resultBounceAnim.setValue(0);
       resultOpacityAnim.setValue(0);
       Animated.parallel([
@@ -162,7 +151,7 @@ export default function TestsScreen() {
 
   const handleShareResult = useCallback(async () => {
     if (!testResult || !activeTest) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const shareText = `I just took the ${activeTest.title} on LoveTestAI and got: ${testResult.label}!\n\n${testResult.summary}\n\n-- Discover yours at LoveTestAI`;
     try {
       if (Platform.OS === 'web') {
@@ -170,18 +159,13 @@ export default function TestsScreen() {
           await navigator.share({ title: `My ${activeTest.title} Result`, text: shareText });
         } else {
           try { await navigator.clipboard.writeText(shareText); } catch { console.log('Copy failed'); }
-          Alert.alert('Copied', 'Result copied to clipboard. Share it with your friends!');
+          Alert.alert('Copied', 'Result copied to clipboard.');
         }
       } else {
-        await Share.share({
-          message: shareText,
-          title: `My ${activeTest.title} Result`,
-        });
+        await Share.share({ message: shareText, title: `My ${activeTest.title} Result` });
       }
     } catch (error: any) {
-      if (error?.message !== 'User did not share') {
-        console.log('Share error:', error);
-      }
+      if (error?.message !== 'User did not share') console.log('Share error:', error);
     }
   }, [testResult, activeTest]);
 
@@ -190,13 +174,7 @@ export default function TestsScreen() {
     return (
       <View style={styles.difficultyDots}>
         {[0, 1, 2].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.difficultyDot,
-              i < level && { backgroundColor: DIFFICULTY_COLORS[Math.min(level - 1, 2)] },
-            ]}
-          />
+          <View key={i} style={[styles.difficultyDot, i < level && { backgroundColor: DIFFICULTY_COLORS[Math.min(level - 1, 2)] }]} />
         ))}
       </View>
     );
@@ -274,6 +252,9 @@ export default function TestsScreen() {
     );
   }
 
+  const featuredTest = TESTS[0];
+  const otherTests = TESTS.slice(1);
+
   return (
     <ScreenBackground>
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -282,39 +263,39 @@ export default function TestsScreen() {
           <Text style={styles.headerSub}>Discover your romantic truth</Text>
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-          <TouchableOpacity onPress={() => startTest(TESTS[0])} activeOpacity={0.9}>
+          <TouchableOpacity onPress={() => startTest(featuredTest)} activeOpacity={0.9}>
             <GlassCard style={styles.featuredCard}>
               <GoldBadge label="MOST POPULAR" />
-              <Text style={styles.featuredTitle}>{TESTS[0].title}</Text>
-              <Text style={styles.featuredDetail}>5 languages · {TESTS[0].duration} · Free</Text>
-              <GhostButton label="Take Test" onPress={() => startTest(TESTS[0])} style={styles.featuredCta} />
+              <Text style={styles.featuredTitle}>{featuredTest.title}</Text>
+              <Text style={styles.featuredDetail}>5 languages · {featuredTest.duration} · Free</Text>
+              <GhostButton label="Take Test" onPress={() => startTest(featuredTest)} style={styles.featuredCta} />
             </GlassCard>
           </TouchableOpacity>
-          <View style={styles.testGrid}>
-            {TESTS.map((test) => (
-              <TouchableOpacity key={test.id} onPress={() => startTest(test)} activeOpacity={0.8}>
-                <GlassCard style={styles.testCard}>
-                  <View style={styles.testIconContainer}>
-                    <LinearGradient colors={[colors.grad_rose_start, colors.grad_violet_end]} style={styles.testIconGradient}>
-                      <Ionicons name={test.icon as any} size={22} color={colors.text_on_grad} />
-                    </LinearGradient>
-                  </View>
+
+          <Text style={styles.sectionLabel}>ALL TESTS</Text>
+          {otherTests.map((test) => (
+            <TouchableOpacity key={test.id} onPress={() => startTest(test)} activeOpacity={0.8}>
+              <GlassCard style={styles.testRow}>
+                <LinearGradient colors={[colors.grad_rose_start, colors.grad_violet_end]} style={styles.testIconGradient}>
+                  <Ionicons name={test.icon as any} size={18} color={colors.text_on_grad} />
+                </LinearGradient>
+                <View style={styles.testInfo}>
                   <Text style={styles.testTitle}>{test.title}</Text>
-                  <Text style={styles.testDesc} numberOfLines={2}>{test.description}</Text>
-                  <View style={styles.testFooter}>
-                    <GoldBadge label={test.duration} />
-                    {renderDifficultyDots(test.duration)}
-                  </View>
+                  <Text style={styles.testDesc}>{test.description}</Text>
+                </View>
+                <View style={styles.testRight}>
+                  <GoldBadge label={test.duration} />
+                  {renderDifficultyDots(test.duration)}
                   {completedTestIds.includes(test.id) && (
                     <View style={styles.completedBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                      <Text style={styles.completedText}>Completed</Text>
+                      <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                      <Text style={styles.completedText}>Done</Text>
                     </View>
                   )}
-                </GlassCard>
-              </TouchableOpacity>
-            ))}
-          </View>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </View>

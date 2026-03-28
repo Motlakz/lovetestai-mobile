@@ -187,12 +187,12 @@ export default function ProfileScreen() {
   const handleDeleteCreation = useCallback((id: string) => {
     Alert.alert('Delete', 'Remove this creation?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteCreation(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
+      { text: 'Delete', style: 'destructive', onPress: () => { deleteCreation(id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
     ]);
   }, [deleteCreation]);
 
   const handleCopyCreation = useCallback(async (content: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (Platform.OS === 'web') {
       try { await navigator.clipboard.writeText(content); } catch { console.log('Copy failed'); }
     } else {
@@ -202,7 +202,7 @@ export default function ProfileScreen() {
   }, []);
 
   const handleShareCreation = useCallback(async (content: string, type: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const shareText = `${type}\n\n${content}\n\n-- Created with LoveTestAI`;
     try {
       if (Platform.OS === 'web') {
@@ -230,7 +230,7 @@ export default function ProfileScreen() {
   }, [profile]);
 
   const handleSaveProfile = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateProfile({ ...profile, name: editName, relationshipStatus: editStatus, dateOfBirth: editDob });
     setShowEditModal(false);
     Alert.alert('Updated', 'Your profile has been updated.');
@@ -242,7 +242,7 @@ export default function ProfileScreen() {
   }, [profile.apiKey]);
 
   const handleSaveApiKey = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateProfile({ ...profile, apiKey: editApiKey });
     setShowApiKeyModal(false);
     Alert.alert('Saved', editApiKey ? 'API key saved. AI features will now use your key.' : 'API key removed. Mock responses will be used.');
@@ -256,14 +256,14 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: () => {
           resetApp();
-          router.replace('/onboarding');
+          router.replace('/onboarding' as any);
         },
       },
     ]);
   }, [resetApp, router]);
 
   const handleRateApp = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (Platform.OS === 'ios') {
       Linking.openURL('https://apps.apple.com').catch(() => {
         Alert.alert('Thank you!', 'We appreciate your support.');
@@ -432,7 +432,7 @@ export default function ProfileScreen() {
                   </View>
                   <TouchableOpacity
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       Alert.alert('Options', '', [
                         { text: 'Copy', onPress: () => handleCopyCreation(creation.content) },
                         { text: 'Share', onPress: () => handleShareCreation(creation.content, creation.type) },
@@ -465,7 +465,7 @@ export default function ProfileScreen() {
               {THEME_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
-                  onPress={() => { setThemeMode(opt.value); Haptics.selectionAsync(); }}
+                  onPress={() => { setThemeMode(opt.value); void Haptics.selectionAsync(); }}
                   style={[styles.themePill, mode === opt.value && styles.themePillActive]}
                 >
                   <Text style={[styles.themePillText, mode === opt.value && styles.themePillTextActive]}>{opt.label}</Text>
@@ -531,7 +531,7 @@ export default function ProfileScreen() {
               <Text style={styles.modalFieldLabel}>Relationship Status</Text>
               <View style={styles.modalPillRow}>
                 {STATUSES.map((s) => (
-                  <TouchableOpacity key={s} onPress={() => { setEditStatus(s); Haptics.selectionAsync(); }} style={[styles.modalPill, editStatus === s && styles.modalPillSelected]}>
+                  <TouchableOpacity key={s} onPress={() => { setEditStatus(s); void Haptics.selectionAsync(); }} style={[styles.modalPill, editStatus === s && styles.modalPillSelected]}>
                     <Text style={[styles.modalPillText, editStatus === s && styles.modalPillTextSelected]}>{s}</Text>
                   </TouchableOpacity>
                 ))}

@@ -8,7 +8,7 @@ import { AppProvider, useApp } from "@/context/AppContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import PaywallModal from "@/components/ui/PaywallModal";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
@@ -21,14 +21,14 @@ function RootLayoutNav() {
   useEffect(() => {
     if (isLoading) return;
 
-    SplashScreen.hideAsync();
+    void SplashScreen.hideAsync();
 
     const inOnboarding = segments[0] === 'onboarding';
 
     if (!onboardingComplete && !inOnboarding) {
       router.replace('/onboarding');
     } else if (onboardingComplete && inOnboarding) {
-      router.replace('/(tabs)/(create)');
+      router.replace('/(tabs)/(home)');
     }
   }, [onboardingComplete, isLoading, segments, router]);
 
@@ -48,6 +48,22 @@ function RootLayoutNav() {
           options={{
             headerShown: false,
             gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="create-mode"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+            gestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="partner-dashboard"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+            gestureEnabled: true,
           }}
         />
       </Stack>

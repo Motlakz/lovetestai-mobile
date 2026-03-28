@@ -1,11 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import { fontSizes } from '@/constants/theme';
+import DrawerMenu from '@/components/ui/DrawerMenu';
+import FeedbackModal from '@/components/ui/FeedbackModal';
 
 interface TabIconProps {
   name: string;
@@ -29,92 +31,105 @@ function TabIcon({ name, activeName, color, focused, activeColor }: TabIconProps
 }
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+
+  const openDrawer = useCallback(() => setDrawerVisible(true), []);
+  const closeDrawer = useCallback(() => setDrawerVisible(false), []);
+  const openFeedback = useCallback(() => setFeedbackVisible(true), []);
+  const closeFeedback = useCallback(() => setFeedbackVisible(false), []);
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bg_elevated,
-          borderTopWidth: 1,
-          borderTopColor: colors.glass_border,
-          height: 60 + (Platform.OS === 'ios' ? insets.bottom : 10),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: colors.text_gold,
-        tabBarInactiveTintColor: colors.text_muted,
-        tabBarLabelStyle: {
-          fontSize: fontSizes.xs,
-          fontWeight: '500' as const,
-          marginTop: 2,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="(create)"
-        options={{
-          title: 'Create',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="create-outline" activeName="create" color={color} focused={focused} activeColor={colors.accent_rose} />
-          ),
+    <View style={{ flex: 1 }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: colors.bg_elevated,
+            borderTopWidth: 1,
+            borderTopColor: colors.glass_border,
+          },
+          tabBarActiveTintColor: colors.text_gold,
+          tabBarInactiveTintColor: colors.text_muted,
+          tabBarLabelStyle: {
+            fontSize: fontSizes.xs,
+            fontWeight: '500' as const,
+            marginTop: 2,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="tests"
-        options={{
-          title: 'Test',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="heart-outline" activeName="heart" color={color} focused={focused} activeColor={colors.accent_rose} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="daily"
-        options={{
-          title: 'Daily',
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.dailyContainer}>
-              <LinearGradient
-                colors={[colors.grad_rose_start, colors.grad_violet_end]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.dailyGradient, { borderColor: colors.accent_gold }, shadows.rose_glow]}
-              >
-                <Ionicons
-                  name={focused ? 'calendar' : 'calendar-outline'}
-                  size={22}
-                  color={colors.text_on_grad}
-                />
-              </LinearGradient>
-            </View>
-          ),
-          tabBarLabel: ({ focused }) => (
-            <Text style={[styles.dailyLabel, { color: focused ? colors.text_gold : colors.text_muted }]}>Daily</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="coach"
-        options={{
-          title: 'Coach',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="chatbubble-outline" activeName="chatbubble" color={color} focused={focused} activeColor={colors.accent_rose} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Me',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="person-outline" activeName="person" color={color} focused={focused} activeColor={colors.accent_rose} />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="(home)"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon name="home-outline" activeName="home" color={color} focused={focused} activeColor={colors.accent_rose} />
+            ),
+            headerShown: false,
+          }}
+          listeners={{
+            tabLongPress: openDrawer,
+          }}
+        />
+        <Tabs.Screen
+          name="tests"
+          options={{
+            title: 'Test',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon name="heart-outline" activeName="heart" color={color} focused={focused} activeColor={colors.accent_rose} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="daily"
+          options={{
+            title: 'Daily',
+            tabBarIcon: ({ focused }) => (
+              <View style={styles.dailyContainer}>
+                <LinearGradient
+                  colors={[colors.grad_rose_start, colors.grad_violet_end]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.dailyGradient, { borderColor: colors.accent_gold }, shadows.rose_glow]}
+                >
+                  <Ionicons
+                    name={focused ? 'calendar' : 'calendar-outline'}
+                    size={22}
+                    color={colors.text_on_grad}
+                  />
+                </LinearGradient>
+              </View>
+            ),
+            tabBarLabel: ({ focused }) => (
+              <Text style={[styles.dailyLabel, { color: focused ? colors.text_gold : colors.text_muted }]}>Daily</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="coach"
+          options={{
+            title: 'Coach',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon name="chatbubble-outline" activeName="chatbubble" color={color} focused={focused} activeColor={colors.accent_rose} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Me',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon name="person-outline" activeName="person" color={color} focused={focused} activeColor={colors.accent_rose} />
+            ),
+          }}
+        />
+      </Tabs>
+
+      <DrawerMenu visible={drawerVisible} onClose={closeDrawer} onOpenFeedback={openFeedback} />
+      <FeedbackModal visible={feedbackVisible} onClose={closeFeedback} />
+    </View>
   );
 }
 

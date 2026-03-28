@@ -135,7 +135,7 @@ export default function OnboardingScreen() {
   const handleComplete = useCallback(() => {
     updateProfile({ ...profile, name, relationshipStatus: status, dateOfBirth: dob, intent });
     completeOnboarding();
-    router.replace('/(tabs)/(create)');
+    router.replace('/(tabs)/(home)');
   }, [name, status, dob, intent, profile, updateProfile, completeOnboarding, router]);
 
   const handleNotifications = useCallback(async () => {
@@ -291,7 +291,7 @@ export default function OnboardingScreen() {
               };
               upgradePlan(planMap[selectedPlan] || 'premium_plus');
               completeOnboarding();
-              router.replace('/(tabs)/(create)');
+              router.replace('/(tabs)/(home)');
             }} />
         <Text style={styles.trialNote}>
           {selectedPlan === 'lifetime' ? 'One-time payment. No subscription.' : `Then ${ONBOARDING_PLANS.find(p => p.id === selectedPlan)?.price || '$8.99/mo'}. Cancel anytime.`}
