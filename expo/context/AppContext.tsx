@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Alert } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { getItem, setItem } from '@/services/storage';
+import {
+  initRevenueCat,
+  purchaseSubscription,
+  purchaseProduct,
+  restorePurchases as rcRestorePurchases,
+  cancelSubscription,
+  type SubscriptionPlanId,
+  type IAPProductId,
+} from '@/services/revenueCat';
 
 export interface Profile {
   name: string;
@@ -11,21 +21,9 @@ export interface Profile {
   apiKey: string;
 }
 
-export type SubscriptionPlan = 'free' | 'generator_unlimited' | 'premium_plus' | 'premium_couples' | 'lifetime';
+export type SubscriptionPlan = SubscriptionPlanId;
 
-export type IAPProduct = 
-  | 'credit_pack_5'
-  | 'premium_card_single'
-  | 'premium_card_all'
-  | 'report_zodiac'
-  | 'report_numerology'
-  | 'report_soulmate'
-  | 'report_attachment'
-  | 'test_love_personality'
-  | 'bundle_starter'
-  | 'bundle_growth'
-  | 'bundle_complete'
-  | 'prompt_deck';
+export type IAPProduct = IAPProductId;
 
 export interface IAPProductInfo {
   id: IAPProduct;
@@ -165,7 +163,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       } else {
         const reset = { count: 0, resetDate: new Date().toISOString() };
         setMonthlyGenerations(reset);
-        setItem('monthly_generations', reset);
+        void setItem('monthly_generations', reset);
       }
 
       if (coach && isCurrentMonth(coach.resetDate)) {
@@ -173,7 +171,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       } else {
         const reset = { count: 0, resetDate: new Date().toISOString() };
         setMonthlyCoachSessions(reset);
-        setItem('monthly_coach_sessions', reset);
+        void setItem('monthly_coach_sessions', reset);
       }
 
       if (prompts) setSavedPrompts(prompts);
@@ -297,7 +295,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
   });
 
-  const { mutate: mutateSetSubscription } = useMutation({
+  const { mutate: _mutateSetSubscription } = useMutation({
     mutationFn: async (plan: SubscriptionPlan) => {
       await setItem('subscription_plan', plan);
       return plan;
@@ -385,15 +383,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     return subscription === 'premium_couples' || subscription === 'lifetime';
   }, [subscription]);
 
-  const hasReport = useMemo(() => (reportId: string): boolean => {
-    if (subscription === 'premium_plus' || subscription === 'premium_couples' || subscription === 'lifetime') return true;
-    if (purchasedIAPs.includes(reportId as IAPProduct)) return true;
-    if (purchasedIAPs.includes('bundle_complete')) return true;
-    if (purchasedIAPs.includes('bundle_growth') && ['report_zodiac', 'report_numerology', 'prompt_deck', 'report_soulmate'].includes(reportId)) return true;
-    if (purchasedIAPs.includes('bundle_starter') && ['prompt_deck', 'report_soulmate'].includes(reportId)) return true;
-    return false;
-  }, [subscription, purchasedIAPs]);
-
   const generationsRemaining = useMemo(() => {
     if (isPremium) return Infinity;
     return Math.max(0, 3 + bonusCredits - monthlyGenerations.count);
@@ -403,6 +392,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
     if (hasCoach) return Infinity;
     return Math.max(0, 3 - monthlyCoachSessions.count);
   }, [monthlyCoachSessions.count, hasCoach]);
+
+  const hasReport = useCallback((reportId: string): boolean => {
+    if (subscription === 'premium_plus' || subscription === 'premium_couples' || subscription === 'lifetime') return true;
+    if (purchasedIAPs.includes(reportId as IAPProduct)) return true;
+    if (purchasedIAPs.includes('bundle_complete')) return true;
+    if (purchasedIAPs.includes('bundle_growth') && ['report_zodiac', 'report_numerology', 'prompt_deck', 'report_soulmate'].includes(reportId)) return true;
+    if (purchasedIAPs.includes('bundle_starter') && ['prompt_deck', 'report_soulmate'].includes(reportId)) return true;
+    return false;
+  }, [subscription, purchasedIAPs]);
+
+  const hasPremiumExport = useMemo(() => {
+    return isPremium || purchasedIAPs.includes('premium_card_all') || purchasedIAPs.includes('premium_card_single');
+  }, [isPremium, purchasedIAPs]);
+
+  const canGenerate = useMemo(() => {
+    return isPremium || generationsRemaining > 0;
+  }, [isPremium, generationsRemaining]);
+
+  const canUseCoach = useMemo(() => {
+    return hasCoach || coachSessionsRemaining > 0;
+  }, [hasCoach, coachSessionsRemaining]);
 
   const completeOnboarding = useCallback(() => {
     mutateCompleteOnboarding();
@@ -449,30 +459,84 @@ export const [AppProvider, useApp] = createContextHook(() => {
     mutateIncrementTests();
   }, [mutateIncrementTests]);
 
-  const { mutate: mutatePurchaseIAP } = useMutation({
-    mutationFn: async (productId: IAPProduct) => {
-      const updated = [...purchasedIAPs, productId];
-      await setItem('purchased_iaps', updated);
-      if (productId === 'credit_pack_5') {
-        const newBonus = bonusCredits + 5;
-        await setItem('bonus_credits', newBonus);
-        return { iaps: updated, bonus: newBonus };
+  const { mutate: mutatePurchaseViRC } = useMutation({
+    mutationFn: async (params: { type: 'subscription'; plan: SubscriptionPlan } | { type: 'iap'; productId: IAPProduct }) => {
+      if (params.type === 'subscription') {
+        console.log('[App] Purchasing subscription via RevenueCat:', params.plan);
+        const result = await purchaseSubscription(params.plan);
+        if (!result.success) throw new Error('Purchase failed');
+        return { plan: params.plan, productId: null };
+      } else {
+        console.log('[App] Purchasing IAP via RevenueCat:', params.productId);
+        const result = await purchaseProduct(params.productId);
+        if (!result.success) throw new Error('Purchase failed');
+        if (params.productId === 'credit_pack_5') {
+          const newBonus = bonusCredits + 5;
+          setBonusCredits(newBonus);
+        }
+        return { plan: null, productId: params.productId };
       }
-      return { iaps: updated, bonus: bonusCredits };
     },
-    onSuccess: (data) => {
-      setPurchasedIAPs(data.iaps);
-      setBonusCredits(data.bonus);
+    onSuccess: async (data) => {
+      if (data.plan) {
+        setSubscription(data.plan);
+      }
+      if (data.productId) {
+        const storedIaps = await getItem<IAPProduct[]>('purchased_iaps') ?? [];
+        setPurchasedIAPs(storedIaps);
+        const storedBonus = await getItem<number>('bonus_credits') ?? 0;
+        setBonusCredits(storedBonus);
+      }
     },
   });
 
   const upgradePlan = useCallback((plan: SubscriptionPlan) => {
-    mutateSetSubscription(plan);
-  }, [mutateSetSubscription]);
+    mutatePurchaseViRC({ type: 'subscription', plan });
+  }, [mutatePurchaseViRC]);
 
   const purchaseIAP = useCallback((productId: IAPProduct) => {
-    mutatePurchaseIAP(productId);
-  }, [mutatePurchaseIAP]);
+    mutatePurchaseViRC({ type: 'iap', productId });
+  }, [mutatePurchaseViRC]);
+
+  const { mutate: mutateRestorePurchases } = useMutation({
+    mutationFn: async () => {
+      console.log('[App] Restoring purchases via RevenueCat...');
+      const info = await rcRestorePurchases();
+      return info;
+    },
+    onSuccess: async (info) => {
+      const entitlementKeys = Object.keys(info.entitlements.active);
+      console.log('[App] Restored entitlements:', entitlementKeys);
+      const storedPlan = await getItem<SubscriptionPlan>('subscription_plan');
+      if (storedPlan && storedPlan !== 'free') {
+        setSubscription(storedPlan);
+        Alert.alert('Restored', `Your ${PLAN_DETAILS[storedPlan].label} plan has been restored.`);
+      } else {
+        Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
+      }
+      const storedIaps = await getItem<IAPProduct[]>('purchased_iaps') ?? [];
+      setPurchasedIAPs(storedIaps);
+    },
+  });
+
+  const restorePurchases = useCallback(() => {
+    mutateRestorePurchases();
+  }, [mutateRestorePurchases]);
+
+  const { mutate: mutateCancelSubscription } = useMutation({
+    mutationFn: async () => {
+      await cancelSubscription();
+      await setItem('subscription_plan', 'free');
+      return true;
+    },
+    onSuccess: () => {
+      setSubscription('free');
+    },
+  });
+
+  const downgradeToFree = useCallback(() => {
+    mutateCancelSubscription();
+  }, [mutateCancelSubscription]);
 
   const openPaywall = useCallback((context?: string) => {
     if (context) setPaywallContext(context);
@@ -488,6 +552,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const resetApp = useCallback(() => {
     mutateResetApp();
   }, [mutateResetApp]);
+
+  useEffect(() => {
+    initRevenueCat().catch(e => console.log('[App] RevenueCat init error:', e));
+  }, []);
 
   return {
     onboardingComplete,
@@ -506,6 +574,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     hasCoach,
     hasCouples,
     hasReport,
+    hasPremiumExport,
+    canGenerate,
+    canUseCoach,
     purchasedIAPs,
     bonusCredits,
     showPaywall,
@@ -523,6 +594,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     incrementTests,
     upgradePlan,
     purchaseIAP,
+    restorePurchases,
+    downgradeToFree,
     openPaywall,
     closePaywall,
     resetApp,

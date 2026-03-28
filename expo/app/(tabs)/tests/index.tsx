@@ -85,7 +85,7 @@ export default function TestsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { incrementTests, isPremium, openPaywall } = useApp();
+  const { incrementTests, isPremium, hasReport, openPaywall, restorePurchases } = useApp();
   const [screenState, setScreenState] = useState<ScreenState>('list');
   const [activeTest, setActiveTest] = useState<TestDefinition | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -239,7 +239,14 @@ export default function TestsScreen() {
             <View style={styles.fullReportSection}>
               <View style={styles.lockedReportContainer}>
                 <Text style={styles.reportPreview} numberOfLines={3}>{testResult.fullReport}</Text>
-                {!isPremium && <LockedOverlay title="Full Report Included in Plus" subtitle="From $8.99/mo or buy individual reports" onUpgrade={openPaywall} onRestore={openPaywall} />}
+                {!isPremium && !hasReport(activeTest.id === 'attachment-style' ? 'report_attachment' : activeTest.id === 'zodiac-compatibility' ? 'report_zodiac' : activeTest.id === 'numerology-love' ? 'report_numerology' : activeTest.id === 'soulmate-calculator' ? 'report_soulmate' : 'test_love_personality') && (
+                  <LockedOverlay
+                    title="Full Report Included in Plus"
+                    subtitle="From $8.99/mo or buy individual reports"
+                    onUpgrade={() => openPaywall('reports')}
+                    onRestore={restorePurchases}
+                  />
+                )}
               </View>
             </View>
             <View style={styles.resultActions}>

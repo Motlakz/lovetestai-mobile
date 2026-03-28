@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,7 +31,7 @@ function TabIcon({ name, activeName, color, focused, activeColor }: TabIconProps
 }
 
 export default function TabLayout() {
-  const _insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
@@ -41,16 +41,27 @@ export default function TabLayout() {
   const openFeedback = useCallback(() => setFeedbackVisible(true), []);
   const closeFeedback = useCallback(() => setFeedbackVisible(false), []);
 
+  const bottomSafe = useMemo(() => {
+    if (insets.bottom > 0) return insets.bottom;
+    if (Platform.OS === 'web') return 12;
+    return 8;
+  }, [insets.bottom]);
+
+  const tabBarStyleMemo = useMemo(() => ({
+    backgroundColor: colors.bg_elevated,
+    borderTopWidth: 1,
+    borderTopColor: colors.glass_border,
+    height: 58 + bottomSafe,
+    paddingBottom: bottomSafe,
+    paddingTop: 6,
+  }), [colors.bg_elevated, colors.glass_border, bottomSafe]);
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
-            backgroundColor: colors.bg_elevated,
-            borderTopWidth: 1,
-            borderTopColor: colors.glass_border,
-          },
+          tabBarStyle: tabBarStyleMemo,
           tabBarActiveTintColor: colors.text_gold,
           tabBarInactiveTintColor: colors.text_muted,
           tabBarLabelStyle: {
@@ -146,12 +157,12 @@ const styles = StyleSheet.create({
   },
   dailyContainer: {
     alignItems: 'center' as const,
-    marginTop: -20,
+    marginTop: -16,
   },
   dailyGradient: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderWidth: 2,
@@ -159,6 +170,6 @@ const styles = StyleSheet.create({
   dailyLabel: {
     fontSize: fontSizes.xs,
     fontWeight: '500' as const,
-    marginTop: 4,
+    marginTop: 2,
   },
 });

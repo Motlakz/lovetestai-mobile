@@ -96,7 +96,7 @@ export default function CreateModeScreen() {
   const { tool } = useLocalSearchParams<{ tool: string }>();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { generationsRemaining, incrementGenerations, saveCreation, profile, isPremium, openPaywall, purchaseIAP } = useApp();
+  const { generationsRemaining, incrementGenerations, saveCreation, profile, isPremium, canGenerate, hasPremiumExport, openPaywall, purchaseIAP } = useApp();
 
   const meta = TOOL_META[tool || 'love-letter'] || TOOL_META['love-letter'];
 
@@ -297,7 +297,7 @@ export default function CreateModeScreen() {
               )}
               {renderToolFields()}
             </GlassCard>
-            <GradientButton label={meta.cta} onPress={handleGenerate} disabled={isLoading || (!isPremium && generationsRemaining <= 0)} style={styles.generateBtn} />
+            <GradientButton label={!canGenerate ? 'Unlock More Credits' : meta.cta} onPress={!canGenerate ? () => openPaywall('credits') : handleGenerate} disabled={isLoading} style={styles.generateBtn} />
             <Text style={styles.disclaimer}>AI-powered · Free to try · Beautiful output</Text>
             {isLoading && <LoadingPulse />}
             {showResult && result && (
@@ -348,7 +348,7 @@ export default function CreateModeScreen() {
                   <Text style={styles.exportOptionLabel}>Copy Text</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
                 </TouchableOpacity>
-                {isPremium ? (
+                {hasPremiumExport ? (
                   <TouchableOpacity style={styles.exportOptionRow} onPress={() => { Alert.alert('Downloaded', 'Premium card saved.'); setShowExportSheet(false); }} activeOpacity={0.7}>
                     <Ionicons name="download-outline" size={22} color={colors.accent_gold} />
                     <Text style={styles.exportOptionLabel}>Download Premium Card</Text>

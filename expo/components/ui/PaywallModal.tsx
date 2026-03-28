@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemeColors, ThemeShadows, fontSizes, spacing, radius } from '@/constants/theme';
-import { useApp, SubscriptionPlan, IAPProduct } from '@/context/AppContext';
+import { useApp, type SubscriptionPlan, type IAPProduct } from '@/context/AppContext';
 import GlassCard from './GlassCard';
 import GradientButton from './GradientButton';
 import GhostButton from './GhostButton';
@@ -435,20 +435,34 @@ export default function PaywallModal() {
   const {
     showPaywall, closePaywall, upgradePlan, purchaseIAP,
     subscription, purchasedIAPs, PLAN_DETAILS,
+    restorePurchases, downgradeToFree,
   } = useApp();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('premium_plus');
   const [activeTab, setActiveTab] = useState<PaywallTab>('plans');
 
   const handlePurchasePlan = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (subscription === selectedPlan) return;
     const plan = SUB_PLANS.find(p => p.id === selectedPlan);
-    upgradePlan(selectedPlan);
     Alert.alert(
-      'Upgrade Successful',
-      `You are now on the ${plan?.name || 'Premium'} plan (${plan?.price}${plan?.period}). All features are now unlocked!`,
-      [{ text: 'Awesome!', onPress: closePaywall }]
+      'Confirm Purchase',
+      `Subscribe to ${plan?.name || 'Premium'} for ${plan?.price}${plan?.period}?\n\nTest Store — Instant activation.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            upgradePlan(selectedPlan);
+            Alert.alert(
+              'Upgrade Successful',
+              `You are now on the ${plan?.name || 'Premium'} plan. All features are now unlocked!`,
+              [{ text: 'Awesome!', onPress: closePaywall }]
+            );
+          },
+        },
+      ]
     );
-  }, [selectedPlan, upgradePlan, closePaywall]);
+  }, [selectedPlan, upgradePlan, closePaywall, subscription]);
 
   const handlePurchaseAddon = useCallback((productId: IAPProduct, productName: string, price: string) => {
     if (purchasedIAPs.includes(productId)) {
@@ -463,7 +477,7 @@ export default function PaywallModal() {
         {
           text: 'Purchase',
           onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             purchaseIAP(productId);
             Alert.alert('Purchased!', `${productName} has been unlocked.`);
           },
@@ -473,34 +487,29 @@ export default function PaywallModal() {
   }, [purchaseIAP, purchasedIAPs]);
 
   const handleRestore = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (subscription !== 'free') {
-      Alert.alert('Restored', `Your ${PLAN_DETAILS[subscription].label} plan has been restored.`);
-      closePaywall();
-    } else {
-      Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
-    }
-  }, [subscription, PLAN_DETAILS, closePaywall]);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    restorePurchases();
+  }, [restorePurchases]);
 
   const handleDowngrade = useCallback(() => {
     Alert.alert(
       'Cancel Subscription',
-      'Are you sure you want to downgrade to the free plan?',
+      'Are you sure you want to downgrade to the free plan? You will lose access to premium features.',
       [
         { text: 'Keep Plan', style: 'cancel' },
         {
           text: 'Downgrade',
           style: 'destructive',
           onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            upgradePlan('free');
-            Alert.alert('Downgraded', 'You are now on the free plan.');
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            downgradeToFree();
+            Alert.alert('Downgraded', 'You are now on the free plan. Free tier limits apply.');
             closePaywall();
           },
         },
       ]
     );
-  }, [upgradePlan, closePaywall]);
+  }, [downgradeToFree, closePaywall]);
 
   const renderPlansTab = () => (
     <>
@@ -521,7 +530,7 @@ export default function PaywallModal() {
           return (
             <TouchableOpacity
               key={plan.id}
-              onPress={() => { setSelectedPlan(plan.id); Haptics.selectionAsync(); }}
+              onPress={() => { setSelectedPlan(plan.id); void Haptics.selectionAsync(); }}
               activeOpacity={0.8}
             >
               <GlassCard
@@ -689,7 +698,7 @@ export default function PaywallModal() {
               {TABS.map((tab) => (
                 <TouchableOpacity
                   key={tab.id}
-                  onPress={() => { setActiveTab(tab.id); Haptics.selectionAsync(); }}
+                  onPress={() => { setActiveTab(tab.id); void Haptics.selectionAsync(); }}
                   style={[styles.tab, activeTab === tab.id && styles.tabActive]}
                 >
                   <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>{tab.label}</Text>

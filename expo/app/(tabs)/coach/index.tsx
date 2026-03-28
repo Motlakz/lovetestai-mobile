@@ -110,7 +110,7 @@ export default function CoachScreen() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { coachSessionsRemaining, incrementCoachSessions, profile, hasCoach, openPaywall } = useApp();
+  const { coachSessionsRemaining, incrementCoachSessions, profile, hasCoach, canUseCoach, openPaywall, restorePurchases } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -121,14 +121,14 @@ export default function CoachScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
 
-  const isLocked = !hasCoach && coachSessionsRemaining <= 0;
+  const isLocked = !canUseCoach;
 
   useEffect(() => {
     setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 100);
   }, [messages]);
 
   const handleCopyText = useCallback(async (text: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (Platform.OS === 'web') {
       try { await navigator.clipboard.writeText(text); } catch { console.log('Copy failed on web'); }
     } else {
@@ -140,7 +140,7 @@ export default function CoachScreen() {
   const handleSend = useCallback(async (text?: string) => {
     const messageText = text || inputText.trim();
     if (!messageText) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (messageText.toLowerCase().includes('rewrite')) { setShowRewritePanel(true); }
     setShowQuickPrompts(false);
     setInputText('');
@@ -154,7 +154,7 @@ export default function CoachScreen() {
       const response = await sendCoachMessage(apiMessages, profile.apiKey || undefined);
       const coachMessage: ChatMessage = { id: (Date.now() + 1).toString(), role: 'coach', content: response, timestamp: new Date().toISOString() };
       setMessages(prev => [...prev, coachMessage]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.log('Coach error:', error);
       Alert.alert('Error', 'Could not get a response. Please try again.');
@@ -165,7 +165,7 @@ export default function CoachScreen() {
 
   const handleRewrite = useCallback(async () => {
     if (!rewriteText.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowRewritePanel(false);
     setIsTyping(true);
     const userMessage: ChatMessage = { id: Date.now().toString(), role: 'user', content: `Please rewrite this message in a ${rewriteTone.toLowerCase()} tone: "${rewriteText}"`, timestamp: new Date().toISOString() };
@@ -174,7 +174,7 @@ export default function CoachScreen() {
       const response = await rewriteMessage(rewriteText, rewriteTone, profile.apiKey || undefined);
       const coachMessage: ChatMessage = { id: (Date.now() + 1).toString(), role: 'coach', content: response, timestamp: new Date().toISOString(), isRewrite: true };
       setMessages(prev => [...prev, coachMessage]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.log('Rewrite error:', error);
       Alert.alert('Error', 'Could not rewrite message. Please try again.');
@@ -233,14 +233,14 @@ export default function CoachScreen() {
           <GlassCard style={styles.disclaimer}>
             <Text style={styles.disclaimerText}>For personal growth and reflection only. Not a substitute for professional mental health support.</Text>
           </GlassCard>
-          {!isLocked && !hasCoach && coachSessionsRemaining < 3 && (
+          {!isLocked && !hasCoach && coachSessionsRemaining < Infinity && (
             <View style={styles.sessionInfo}>
               <Text style={styles.sessionText}>{coachSessionsRemaining} free session{coachSessionsRemaining !== 1 ? 's' : ''} remaining this month</Text>
             </View>
           )}
           {isLocked ? (
             <View style={styles.lockedContainer}>
-              <LockedOverlay title="3 free coaching sessions used this month" subtitle="Upgrade for unlimited sessions" ctaLabel="See Plans · from $8.99/mo" onUpgrade={openPaywall} onRestore={openPaywall} />
+              <LockedOverlay title="3 free coaching sessions used this month" subtitle="Upgrade for unlimited sessions. Sessions reset on the 1st of each month." ctaLabel="Upgrade to Plus · $8.99/mo" onUpgrade={() => openPaywall('coach')} onRestore={restorePurchases} />
             </View>
           ) : (
             <>
@@ -280,7 +280,7 @@ export default function CoachScreen() {
                   <TextInput value={rewriteText} onChangeText={setRewriteText} placeholder="Paste your original message..." placeholderTextColor={colors.text_muted} multiline style={styles.rewriteInput} />
                   <View style={styles.toneRow}>
                     {REWRITE_TONES.map((t) => (
-                      <TouchableOpacity key={t} onPress={() => { setRewriteTone(t); Haptics.selectionAsync(); }} style={[styles.tonePill, rewriteTone === t && styles.tonePillSelected]}>
+                      <TouchableOpacity key={t} onPress={() => { setRewriteTone(t); void Haptics.selectionAsync(); }} style={[styles.tonePill, rewriteTone === t && styles.tonePillSelected]}>
                         <Text style={[styles.tonePillText, rewriteTone === t && styles.tonePillTextSelected]}>{t}</Text>
                       </TouchableOpacity>
                     ))}

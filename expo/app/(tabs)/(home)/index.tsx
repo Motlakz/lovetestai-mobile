@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,7 +81,7 @@ export default function HomeScreen() {
   const { colors, shadows } = useTheme();
   const router = useRouter();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { profile, generationsRemaining, isPremium, hasCouples, openPaywall, streakData, savedCreations, completedTests } = useApp();
+  const { profile, generationsRemaining, isPremium, canGenerate, hasCouples, openPaywall, streakData, savedCreations, completedTests, purchaseIAP } = useApp();
 
   const FEATURES: FeatureCard[] = useMemo(() => [
     { id: 'love-letter', icon: 'mail-outline', label: 'Love Letter', description: 'Write a heartfelt, personal letter', gradient: [colors.grad_rose_start, colors.grad_rose_end], route: '/create-mode?tool=love-letter' },
@@ -149,12 +150,24 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {!isPremium && generationsRemaining <= 1 && (
+          {!isPremium && (
             <GlassCard style={styles.counterBanner}>
-              <Text style={styles.counterText}>
-                {generationsRemaining > 0 ? `${generationsRemaining} free creation remaining` : 'Monthly limit reached'}
+              <Text style={[styles.counterText, !canGenerate && { color: colors.error }]}>
+                {canGenerate
+                  ? `${generationsRemaining === Infinity ? 'Unlimited' : generationsRemaining} creation${generationsRemaining !== 1 ? 's' : ''} remaining`
+                  : 'Monthly limit reached'}
               </Text>
-              <GradientButton label="Unlock" onPress={() => openPaywall()} small />
+              {!canGenerate ? (
+                <GradientButton label="Get Credits" onPress={() => {
+                  Alert.alert('Get More Credits', 'Choose an option:', [
+                    { text: '5 Credits · $0.99', onPress: () => purchaseIAP('credit_pack_5') },
+                    { text: 'Unlimited · $3.99/mo', onPress: () => openPaywall('credits') },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                }} small />
+              ) : generationsRemaining <= 1 ? (
+                <GradientButton label="Unlock" onPress={() => openPaywall()} small />
+              ) : null}
             </GlassCard>
           )}
 

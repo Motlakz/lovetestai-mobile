@@ -110,7 +110,7 @@ export default function DailyScreen() {
   const {
     profile, streakData, todayPromptIndex, saveJournalEntry,
     savePrompt, savedPrompts, deleteSavedPrompt,
-    journalEntries, deleteJournalEntry, hasCouples, openPaywall,
+    journalEntries, deleteJournalEntry, hasCouples, openPaywall, restorePurchases,
   } = useApp();
   const [showJournal, setShowJournal] = useState(false);
   const [journalText, setJournalText] = useState('');
@@ -127,7 +127,7 @@ export default function DailyScreen() {
   }, [fadeAnim]);
 
   const toggleJournal = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (showJournal) {
       Animated.timing(journalHeight, { toValue: 0, duration: 300, useNativeDriver: false }).start(() => setShowJournal(false));
     } else {
@@ -138,7 +138,7 @@ export default function DailyScreen() {
 
   const handleSaveEntry = useCallback(() => {
     if (!journalText.trim()) { Alert.alert('Empty entry', 'Write something before saving.'); return; }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     saveJournalEntry({ id: Date.now().toString(), promptText: todayPrompt.text, entry: journalText, date: new Date().toISOString() });
     setJournalText('');
     setShowJournal(false);
@@ -152,7 +152,7 @@ export default function DailyScreen() {
       Alert.alert('Already Saved', 'This prompt is already in your saved prompts.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     savePrompt({ id: Date.now().toString(), text: todayPrompt.text, savedAt: new Date().toISOString() });
     Alert.alert('Saved', 'Prompt saved to your collection.');
   }, [todayPrompt, savePrompt, savedPrompts]);
@@ -160,14 +160,14 @@ export default function DailyScreen() {
   const handleDeleteSavedPrompt = useCallback((id: string) => {
     Alert.alert('Remove Prompt', 'Remove this saved prompt?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => { deleteSavedPrompt(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
+      { text: 'Remove', style: 'destructive', onPress: () => { deleteSavedPrompt(id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
     ]);
   }, [deleteSavedPrompt]);
 
   const handleDeleteJournalEntry = useCallback((id: string) => {
     Alert.alert('Delete Entry', 'Delete this journal entry?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteJournalEntry(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
+      { text: 'Delete', style: 'destructive', onPress: () => { deleteJournalEntry(id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
     ]);
   }, [deleteJournalEntry]);
 
@@ -278,7 +278,7 @@ export default function DailyScreen() {
             <SectionTitle title="Browse Prompts" style={styles.sectionTitle} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
               {PROMPT_CATEGORIES.map((cat) => (
-                <TouchableOpacity key={cat} onPress={() => { setSelectedCategory(cat); Haptics.selectionAsync(); }} style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipSelected]}>
+                <TouchableOpacity key={cat} onPress={() => { setSelectedCategory(cat); void Haptics.selectionAsync(); }} style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipSelected]}>
                   <Text style={[styles.categoryText, selectedCategory === cat && styles.categoryTextSelected]}>{cat}</Text>
                 </TouchableOpacity>
               ))}
@@ -325,7 +325,7 @@ export default function DailyScreen() {
               <GlassCard style={styles.partnerCard}>
                 <Text style={styles.partnerCardTitle}>Send today{"'"}s prompt to your partner</Text>
                 <Text style={styles.partnerCardSub}>Both answer privately, then see each other{"'"}s responses</Text>
-                {!hasCouples && <LockedOverlay title="Partner Prompts · Couples Plan" subtitle="$14.99/mo or Lifetime $79.99" ctaLabel="See Plans" onUpgrade={openPaywall} onRestore={openPaywall} compact />}
+                {!hasCouples && <LockedOverlay title="Partner Prompts · Couples Plan" subtitle="$14.99/mo or Lifetime $79.99" ctaLabel="See Plans" onUpgrade={() => openPaywall('couples')} onRestore={restorePurchases} compact />}
               </GlassCard>
             </View>
             <View style={styles.bottomSpacer} />
