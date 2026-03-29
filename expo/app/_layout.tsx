@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import PaywallModal from "@/components/ui/PaywallModal";
+import AnimatedSplash from "@/components/ui/AnimatedSplash";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -17,6 +18,11 @@ function RootLayoutNav() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const segments = useSegments();
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashFinish = useCallback(() => {
+    setShowSplash(false);
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -36,6 +42,7 @@ function RootLayoutNav() {
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
       <PaywallModal />
+      {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
       <Stack
         screenOptions={{
           headerShown: false,
