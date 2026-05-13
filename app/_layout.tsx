@@ -2,11 +2,32 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState, useCallback } from "react";
+import { useFonts } from "expo-font";
+import {
+  CormorantGaramond_400Regular,
+  CormorantGaramond_600SemiBold,
+  CormorantGaramond_700Bold,
+} from "@expo-google-fonts/cormorant-garamond";
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_700Bold,
+} from "@expo-google-fonts/playfair-display";
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_700Bold,
+} from "@expo-google-fonts/dm-sans";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import AnimatedSplash from "@/components/ui/AnimatedSplash";
+import { ToastProvider } from "@/components/ui/Toast";
+import { AppAlertProvider } from "@/components/ui/AppAlertModal";
+import { AuthGateProvider } from "@/components/auth/AuthGateModal";
+import { useAuthStore } from "@/store/authStore";
+import { usePartnerStore } from "@/store/partnerStore";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -18,13 +39,29 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const [showSplash, setShowSplash] = useState(true);
+  const [fontsLoaded] = useFonts({
+    CormorantGaramond_400Regular,
+    CormorantGaramond_600SemiBold,
+    CormorantGaramond_700Bold,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_700Bold,
+  });
+
+  useEffect(() => {
+    void useAuthStore.getState().init();
+    void usePartnerStore.getState().init();
+  }, []);
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
   }, []);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !fontsLoaded) return;
 
     void SplashScreen.hideAsync();
 
@@ -35,7 +72,7 @@ function RootLayoutNav() {
     } else if (onboardingComplete && inOnboarding) {
       router.replace('/(tabs)/(home)');
     }
-  }, [onboardingComplete, isLoading, segments, router]);
+  }, [onboardingComplete, isLoading, fontsLoaded, segments, router]);
 
   return (
     <>
@@ -74,7 +111,13 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
           <AppProvider>
-            <RootLayoutNav />
+            <AppAlertProvider>
+              <ToastProvider>
+                <AuthGateProvider>
+                  <RootLayoutNav />
+                </AuthGateProvider>
+              </ToastProvider>
+            </AppAlertProvider>
           </AppProvider>
         </ThemeProvider>
       </GestureHandlerRootView>

@@ -12,8 +12,8 @@ import Svg, { Path, Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 const { width: W, height: H } = Dimensions.get('window');
 
-const PARTICLE_COUNT = 18;
-const RING_COUNT = 3;
+const PARTICLE_COUNT = 8;
+const RING_COUNT = 2;
 
 interface Particle {
   x: Animated.Value;
@@ -55,7 +55,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
   const ringAnims = useRef(
     Array.from({ length: RING_COUNT }, () => ({
       scale: new Animated.Value(0),
-      opacity: new Animated.Value(0.8),
+      opacity: new Animated.Value(0.45),
     }))
   ).current;
 
@@ -67,33 +67,34 @@ export default function AnimatedSplash({ onFinish }: Props) {
   const particles = useRef<Particle[]>(
     Array.from({ length: PARTICLE_COUNT }, (_, i) => {
       const angle = (i / PARTICLE_COUNT) * Math.PI * 2;
-      const radius = 80 + Math.random() * 120;
+      const radius = 86 + (i % 2) * 18;
       const cx = W / 2;
       const cy = H / 2 - 40;
+      const startRadius = 46 + (i % 3) * 8;
       return {
-        x: new Animated.Value(cx),
-        y: new Animated.Value(cy),
+        x: new Animated.Value(cx + Math.cos(angle) * startRadius),
+        y: new Animated.Value(cy + Math.sin(angle) * startRadius * 0.65),
         opacity: new Animated.Value(0),
         scale: new Animated.Value(0),
-        startX: cx,
-        startY: cy,
-        endX: cx + Math.cos(angle) * radius,
-        endY: cy + Math.sin(angle) * radius,
-        size: 3 + Math.random() * 6,
+        startX: cx + Math.cos(angle) * startRadius,
+        startY: cy + Math.sin(angle) * startRadius * 0.65,
+        endX: cx + Math.cos(angle + 0.28) * radius,
+        endY: cy + Math.sin(angle + 0.28) * radius * 0.62,
+        size: 3 + (i % 3) * 1.2,
         color: [
-          '#FF3D7F', '#B44FFF', '#FFD166', '#FFB3C6',
+          '#FF7AA8', '#CFA8FF', '#FFDDA1', '#F7B8CF',
         ][i % 4],
-        delay: i * 60,
+        delay: i * 90,
       };
     })
   ).current;
 
   const starbursts = useRef(
-    Array.from({ length: 6 }, (_, i) => ({
+    Array.from({ length: 4 }, (_, i) => ({
       opacity: new Animated.Value(0),
       scale: new Animated.Value(0),
       rotation: new Animated.Value(0),
-      angle: (i / 6) * 360,
+      angle: 45 + (i / 4) * 360,
     }))
   ).current;
 
@@ -176,15 +177,15 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const ringAnimations = ringAnims.map((ring, i) =>
       Animated.parallel([
         Animated.timing(ring.scale, {
-          toValue: 2.5 + i * 0.5,
-          duration: 1200,
+          toValue: 2.1 + i * 0.45,
+          duration: 1500,
           delay: 600 + i * 200,
-          easing: Easing.out(Easing.cubic),
+          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(ring.opacity, {
           toValue: 0,
-          duration: 1200,
+          duration: 1500,
           delay: 600 + i * 200,
           useNativeDriver: true,
         }),
@@ -194,30 +195,30 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const particleAnims = particles.map((p) =>
       Animated.parallel([
         Animated.timing(p.opacity, {
-          toValue: 1,
-          duration: 400,
-          delay: 800 + p.delay,
+          toValue: 0.62,
+          duration: 650,
+          delay: 700 + p.delay,
           useNativeDriver: true,
         }),
         Animated.spring(p.scale, {
           toValue: 1,
-          friction: 5,
-          tension: 80,
-          delay: 800 + p.delay,
+          friction: 7,
+          tension: 45,
+          delay: 700 + p.delay,
           useNativeDriver: true,
         }),
         Animated.timing(p.x, {
           toValue: p.endX,
-          duration: 1000,
-          delay: 800 + p.delay,
-          easing: Easing.out(Easing.cubic),
+          duration: 1800,
+          delay: 700 + p.delay,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(p.y, {
           toValue: p.endY,
-          duration: 1000,
-          delay: 800 + p.delay,
-          easing: Easing.out(Easing.cubic),
+          duration: 1800,
+          delay: 700 + p.delay,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ])
@@ -226,7 +227,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const particleFadeOut = particles.map((p) =>
       Animated.timing(p.opacity, {
         toValue: 0,
-        duration: 600,
+        duration: 800,
         delay: 0,
         useNativeDriver: true,
       })
@@ -235,23 +236,23 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const starburstAnims = starbursts.map((s, i) =>
       Animated.parallel([
         Animated.timing(s.opacity, {
-          toValue: 0.8,
-          duration: 300,
-          delay: 1000 + i * 80,
+          toValue: 0.38,
+          duration: 500,
+          delay: 1000 + i * 140,
           useNativeDriver: true,
         }),
         Animated.spring(s.scale, {
           toValue: 1,
-          friction: 4,
-          tension: 100,
-          delay: 1000 + i * 80,
+          friction: 7,
+          tension: 55,
+          delay: 1000 + i * 140,
           useNativeDriver: true,
         }),
         Animated.timing(s.rotation, {
           toValue: 1,
-          duration: 600,
-          delay: 1000 + i * 80,
-          easing: Easing.out(Easing.cubic),
+          duration: 900,
+          delay: 1000 + i * 140,
+          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
       ])
@@ -260,7 +261,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const starburstFade = starbursts.map((s) =>
       Animated.timing(s.opacity, {
         toValue: 0,
-        duration: 500,
+        duration: 700,
         useNativeDriver: true,
       })
     );
@@ -297,14 +298,14 @@ export default function AnimatedSplash({ onFinish }: Props) {
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(heartPulse, {
-          toValue: 1.08,
-          duration: 600,
+          toValue: 1.045,
+          duration: 900,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(heartPulse, {
           toValue: 1,
-          duration: 600,
+          duration: 900,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -338,8 +339,10 @@ export default function AnimatedSplash({ onFinish }: Props) {
         textReveal,
         shimmerAnim,
       ]),
-      Animated.parallel(particleFadeOut),
-      Animated.parallel(starburstFade),
+      Animated.parallel([
+        ...particleFadeOut,
+        ...starburstFade,
+      ]),
       Animated.delay(600),
       pulseLoop,
     ]).start();
@@ -683,7 +686,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   particle: {
     position: 'absolute',
@@ -698,7 +701,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   starLine: {
-    width: 18,
+    width: 12,
     height: 2,
     borderRadius: 1,
   },

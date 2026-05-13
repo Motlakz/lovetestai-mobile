@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Animated,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +16,7 @@ import { fontSizes, spacing, radius } from '@/constants/theme';
 import GlassCard from './GlassCard';
 import GradientButton from './GradientButton';
 import GhostButton from './GhostButton';
+import { useToast } from './Toast';
 
 interface FeedbackModalProps {
   visible: boolean;
@@ -33,6 +33,7 @@ const RATING_CONFIG: { value: number; icon: string; label: string; color: string
 
 export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   const { colors } = useTheme();
+  const toast = useToast();
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -70,7 +71,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
 
   const handleSubmit = useCallback(() => {
     if (rating === 0) {
-      Alert.alert('Rating Required', 'Please select a rating before submitting.');
+      toast.warning('Please select a rating before submitting.');
       return;
     }
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -80,7 +81,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
     setTimeout(() => {
       onClose();
     }, 2000);
-  }, [rating, onClose, successAnim]);
+  }, [rating, onClose, successAnim, toast]);
 
   const selectedConfig = rating > 0 ? RATING_CONFIG[rating - 1] : null;
   const successScale = successAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   Modal,
   TextInput,
@@ -29,6 +28,12 @@ import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { useApp } from '@/context/AppContext';
+import { useToast } from '@/components/ui/Toast';
+import { useAppAlert } from '@/components/ui/AppAlertModal';
+import { useAuthStore } from '@/store/authStore';
+import { useAuthGate } from '@/components/auth/AuthGateModal';
+import FeedbackModal from '@/components/ui/FeedbackModal';
+import { buildViralCreationShareText } from '@/services/creationTemplates';
 
 const STATUSES = ['Single', 'In a Relationship', "It's Complicated", 'Prefer not to say'];
 
@@ -70,6 +75,7 @@ function createStyles(c: ThemeColors) {
     emptyCard: { padding: spacing.xl, alignItems: 'center' as const, marginBottom: spacing.xl },
     emptyText: { fontSize: fontSizes.base, color: c.text_muted, fontStyle: 'italic' as const },
     creationCard: { padding: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md, marginBottom: spacing.sm },
+    creationCardSelected: { borderColor: c.accent_rose, backgroundColor: `${c.accent_rose}12` },
     creationLeft: { alignItems: 'center' as const, gap: spacing.xs },
     creationType: { fontSize: fontSizes.xs, color: c.text_muted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
     creationCenter: { flex: 1 },
@@ -77,15 +83,49 @@ function createStyles(c: ThemeColors) {
     creationDate: { fontSize: fontSizes.xs, color: c.text_muted, marginTop: spacing.xs },
     divider: { marginVertical: spacing.lg },
     themeSectionTitle: { fontSize: fontSizes.sm, color: c.text_muted, fontWeight: '600' as const, letterSpacing: 1.2, textTransform: 'uppercase' as const, marginBottom: spacing.md, marginTop: spacing.sm },
-    themeRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: c.glass_border },
-    themeLabel: { flex: 1, fontSize: fontSizes.base, color: c.text_primary },
-    themePillRow: { flexDirection: 'row' as const, gap: spacing.sm },
-    themePill: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.glass_fill },
-    themePillActive: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.12)' },
-    themePillText: { fontSize: fontSizes.sm, color: c.text_muted, fontWeight: '500' as const },
-    themePillTextActive: { color: c.text_primary },
     settingsRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: c.glass_border },
     settingsLabel: { flex: 1, fontSize: fontSizes.base, color: c.text_primary },
+    themeCurrentHint: { fontSize: fontSizes.sm, color: c.text_muted, fontWeight: '500' as const },
+    themeSheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' as const },
+    themeSheet: {
+      backgroundColor: c.bg_deep,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['2xl'],
+      borderTopWidth: 1,
+      borderTopColor: c.glass_border,
+    },
+    themeSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: c.glass_border, alignSelf: 'center' as const, marginBottom: spacing.lg },
+    themeSheetTitle: { fontSize: fontSizes.lg, fontWeight: '700' as const, color: c.text_primary, marginBottom: spacing.md },
+    themeOption: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      marginBottom: spacing.sm,
+    },
+    themeOptionActive: {
+      borderColor: c.accent_rose,
+      backgroundColor: `${c.accent_rose}14`,
+    },
+    themeOptionIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      backgroundColor: `${c.accent_violet}20`,
+    },
+    themeOptionBody: { flex: 1 },
+    themeOptionLabel: { fontSize: fontSizes.base, fontWeight: '600' as const, color: c.text_primary },
+    themeOptionDesc: { fontSize: fontSizes.xs, color: c.text_muted, marginTop: 2 },
     footer: { fontSize: fontSizes.xs, color: c.text_muted, textAlign: 'center' as const, marginTop: spacing['2xl'], lineHeight: 16 },
     bottomSpacer: { height: 40 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' as const, alignItems: 'center' as const, padding: spacing.xl },
@@ -106,23 +146,52 @@ function createStyles(c: ThemeColors) {
     apiKeyStatusText: { fontSize: fontSizes.sm, color: c.success },
     apiKeyStatusTextInactive: { color: c.text_muted },
     settingsSignOut: { color: c.error },
+    accountChip: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      borderRadius: radius.full,
+      backgroundColor: `${c.accent_rose}14`,
+      borderWidth: 1,
+      borderColor: `${c.accent_rose}40`,
+      marginTop: spacing.xs,
+      maxWidth: '100%' as const,
+    },
+    accountChipText: { fontSize: fontSizes.xs, color: c.text_secondary, fontWeight: '500' as const },
     dobNote: { fontSize: fontSizes.xs, color: c.text_muted, marginTop: spacing.xs },
     showMoreBtn: { alignSelf: 'center' as const, marginTop: spacing.sm, marginBottom: spacing.lg },
+    selectionBar: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm, marginBottom: spacing.md },
+    selectionText: { flex: 1, color: c.text_secondary, fontSize: fontSizes.sm, fontWeight: '600' as const },
+    selectionAction: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border },
+    selectionActionText: { color: c.text_primary, fontSize: fontSizes.xs, fontWeight: '700' as const },
+    selectionDeleteText: { color: c.error },
   });
 }
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { colors, isDark, mode, setThemeMode } = useTheme();
+  const { colors, mode, setThemeMode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { profile, savedCreations, streakData, completedTests, deleteCreation, updateProfile, resetApp, isPremium, subscription, openPaywall, PLAN_DETAILS } = useApp();
+  const { profile, savedCreations, streakData, completedTests, deleteCreation, deleteCreations, updateProfile, resetApp } = useApp();
+  const toast = useToast();
+  const { alert, confirm } = useAppAlert();
+  const account = useAuthStore((s) => s.account);
+  const signOutAccount = useAuthStore((s) => s.signOut);
+  const { openSignIn } = useAuthGate();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editStatus, setEditStatus] = useState(profile.relationshipStatus);
   const [editDob, setEditDob] = useState(profile.dateOfBirth);
   const [showAllCreations, setShowAllCreations] = useState(false);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [themeSheetVisible, setThemeSheetVisible] = useState(false);
+  const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
+
+  const selectionActive = selectedCreationIds.length > 0;
 
   const initials = (profile.name || 'LT')
     .split(' ')
@@ -182,12 +251,13 @@ export default function ProfileScreen() {
     }
   }, []);
 
-  const handleDeleteCreation = useCallback((id: string) => {
-    Alert.alert('Delete', 'Remove this creation?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteCreation(id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } },
-    ]);
-  }, [deleteCreation]);
+  const handleDeleteCreation = useCallback(async (id: string) => {
+    const ok = await confirm('Remove this creation?');
+    if (!ok) return;
+    deleteCreation(id);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    toast.success('Creation removed.');
+  }, [deleteCreation, confirm, toast]);
 
   const handleCopyCreation = useCallback(async (content: string) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -196,19 +266,19 @@ export default function ProfileScreen() {
     } else {
       await Clipboard.setStringAsync(content);
     }
-    Alert.alert('Copied', 'Content copied to clipboard');
-  }, []);
+    toast.success('Content copied to clipboard');
+  }, [toast]);
 
   const handleShareCreation = useCallback(async (content: string, type: string) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const shareText = `${type}\n\n${content}\n\n-- Created with Love Test AI`;
+    const shareText = buildViralCreationShareText({ type, content });
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.share) {
           await navigator.share({ title: type, text: shareText });
         } else {
           try { await navigator.clipboard.writeText(shareText); } catch { console.log('Share copy failed'); }
-          Alert.alert('Copied', 'Text copied to clipboard. Share it with your friends!');
+          toast.success('Text copied. Share it with your friends!');
         }
       } else {
         await Share.share({ message: shareText, title: type });
@@ -218,7 +288,33 @@ export default function ProfileScreen() {
         console.log('Share error:', error);
       }
     }
+  }, [toast]);
+
+  const toggleCreationSelection = useCallback((id: string) => {
+    setSelectedCreationIds((prev) => (
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    ));
   }, []);
+
+  const startCreationSelection = useCallback((id: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedCreationIds((prev) => prev.includes(id) ? prev : [...prev, id]);
+  }, []);
+
+  const clearCreationSelection = useCallback(() => {
+    setSelectedCreationIds([]);
+  }, []);
+
+  const handleBulkDeleteCreations = useCallback(async () => {
+    if (selectedCreationIds.length === 0) return;
+    const count = selectedCreationIds.length;
+    const ok = await confirm(`Delete ${count} selected creation${count === 1 ? '' : 's'}?`);
+    if (!ok) return;
+    deleteCreations(selectedCreationIds);
+    setSelectedCreationIds([]);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.success(`${count} creation${count === 1 ? '' : 's'} removed.`);
+  }, [confirm, deleteCreations, selectedCreationIds, toast]);
 
   const handleOpenEditModal = useCallback(() => {
     setEditName(profile.name);
@@ -231,69 +327,103 @@ export default function ProfileScreen() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateProfile({ ...profile, name: editName, relationshipStatus: editStatus, dateOfBirth: editDob });
     setShowEditModal(false);
-    Alert.alert('Updated', 'Your profile has been updated.');
-  }, [editName, editStatus, editDob, profile, updateProfile]);
+    toast.success('Profile updated.');
+  }, [editName, editStatus, editDob, profile, updateProfile, toast]);
 
-  const handleSignOut = useCallback(() => {
-    Alert.alert('Sign Out', 'This will reset all your data and return to onboarding. Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () => {
-          resetApp();
-          router.replace('/onboarding' as any);
+  const handleSignIn = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const ok = await openSignIn();
+    if (ok) toast.success('Welcome back.');
+  }, [openSignIn, toast]);
+
+  const handleSignOutAccount = useCallback(() => {
+    alert({
+      title: 'Sign out of account?',
+      message: 'Your local notes and prompts stay on this device. Sign back in anytime to sync.',
+      icon: 'log-out-outline',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOutAccount();
+            toast.info('Signed out of account.');
+          },
         },
-      },
-    ]);
-  }, [resetApp, router]);
+      ],
+    });
+  }, [alert, signOutAccount, toast]);
+
+  const handleResetApp = useCallback(() => {
+    alert({
+      title: 'Reset all local data?',
+      message: 'This clears every creation, prompt, and reflection on this device and returns you to onboarding.',
+      icon: 'trash-outline',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetApp();
+            router.replace('/onboarding' as any);
+          },
+        },
+      ],
+    });
+  }, [resetApp, router, alert]);
 
   const handleRateApp = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (Platform.OS === 'ios') {
-      Linking.openURL('https://apps.apple.com').catch(() => {
-        Alert.alert('Thank you!', 'We appreciate your support.');
-      });
-    } else if (Platform.OS === 'android') {
-      Linking.openURL('https://play.google.com/store').catch(() => {
-        Alert.alert('Thank you!', 'We appreciate your support.');
-      });
-    } else {
-      Alert.alert('Thank you!', 'We appreciate your support.');
-    }
+    setFeedbackVisible(true);
   }, []);
 
   const handlePrivacyPolicy = useCallback(() => {
     Linking.openURL('https://lovetestai.com/privacy').catch(() => {
-      Alert.alert('Privacy Policy', 'Our privacy policy ensures your data stays private and secure. We do not share your personal information with third parties. All AI-generated content is processed securely and not stored on our servers.');
+      alert({
+        title: 'Privacy Policy',
+        message: 'Our privacy policy ensures your data stays private and secure. We do not share your personal information with third parties. All AI-generated content is processed securely and not stored on our servers.',
+        icon: 'shield-checkmark-outline',
+      });
     });
-  }, []);
+  }, [alert]);
 
   const handleNotificationPrefs = useCallback(() => {
-    Alert.alert(
-      'Notification Preferences',
-      'Choose when to receive daily prompts',
-      [
-        { text: 'Daily at 9 AM (default)', onPress: () => Alert.alert('Set', 'Daily prompts at 9 AM') },
-        { text: 'Daily at 7 PM', onPress: () => Alert.alert('Set', 'Daily prompts at 7 PM') },
-        { text: 'Turn Off', style: 'destructive', onPress: () => Alert.alert('Disabled', 'Daily prompt notifications turned off') },
+    alert({
+      title: 'Notification Preferences',
+      message: 'Choose when to receive daily prompts',
+      icon: 'notifications-outline',
+      buttons: [
+        { text: 'Daily at 9 AM (default)', onPress: () => toast.success('Daily prompts at 9 AM') },
+        { text: 'Daily at 7 PM', onPress: () => toast.success('Daily prompts at 7 PM') },
+        { text: 'Turn Off', style: 'destructive', onPress: () => toast.info('Daily prompt notifications turned off') },
         { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  }, []);
+      ],
+    });
+  }, [alert, toast]);
+
+  const handleTwoPlayerInfo = useCallback(() => {
+    alert({
+      title: 'Two-Player Prompts',
+      message:
+        'Sign in with Google, then share your 6-character pair code with someone you love. Once they accept, you both share the same daily prompt. Reflect on it together — your responses stay private to each of you until you choose to share them.',
+      icon: 'people-outline',
+      buttons: [
+        { text: 'Open Partner Mode', onPress: () => router.push('/(tabs)/partner' as any) },
+        { text: 'Close', style: 'cancel' },
+      ],
+    });
+  }, [alert, router]);
 
   const handleLanguage = useCallback(() => {
-    Alert.alert(
-      'Language',
-      'Select your preferred language for AI-generated content',
-      [
-        { text: 'English', onPress: () => Alert.alert('Set', 'Language set to English') },
-        { text: 'Spanish', onPress: () => Alert.alert('Set', 'Language set to Spanish') },
-        { text: 'French', onPress: () => Alert.alert('Set', 'Language set to French') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  }, []);
+    alert({
+      title: 'Language',
+      message: 'Multilingual prompts and AI generations are coming soon. For now everything ships in English.',
+      icon: 'language-outline',
+      buttons: [{ text: 'Got it', style: 'cancel' }],
+    });
+  }, [alert]);
 
   const renderSettingsRow = (icon: string, label: string, onPress: () => void, badge?: string, isDestructive?: boolean) => (
     <TouchableOpacity onPress={onPress} style={styles.settingsRow} activeOpacity={0.7}>
@@ -304,11 +434,13 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const THEME_OPTIONS: { label: string; value: ThemeMode }[] = [
-    { label: 'Dark', value: 'dark' },
-    { label: 'Light', value: 'light' },
-    { label: 'System', value: 'system' },
+  const THEME_OPTIONS: { label: string; value: ThemeMode; icon: string; description: string }[] = [
+    { label: 'Light', value: 'light', icon: 'sunny-outline', description: 'Bright and clear all day' },
+    { label: 'Dark', value: 'dark', icon: 'moon-outline', description: 'Easier on the eyes at night' },
+    { label: 'System', value: 'system', icon: 'phone-portrait-outline', description: 'Match your device' },
   ];
+
+  const currentTheme = THEME_OPTIONS.find((t) => t.value === mode) ?? THEME_OPTIONS[1];
 
   const zodiacSign = getZodiacSign(profile.dateOfBirth);
 
@@ -340,6 +472,12 @@ export default function ProfileScreen() {
             ) : profile.dateOfBirth ? (
               <Text style={styles.profileDob}>{formatDob(profile.dateOfBirth)}</Text>
             ) : null}
+            {account && (
+              <View style={styles.accountChip}>
+                <Ionicons name="logo-google" size={14} color={colors.accent_rose} />
+                <Text style={styles.accountChipText} numberOfLines={1}>{account.email}</Text>
+              </View>
+            )}
             <GhostButton label="Edit Profile" onPress={handleOpenEditModal} style={styles.editBtn} />
           </GlassCard>
 
@@ -361,41 +499,6 @@ export default function ProfileScreen() {
             </GlassCard>
           </View>
 
-          {isPremium ? (
-            <GlassCard style={styles.upgradeBanner}>
-              <GoldBadge label="ACTIVE PLAN" />
-              <Text style={styles.upgradeTitle}>{PLAN_DETAILS[subscription].label}</Text>
-              <Text style={styles.upgradeFeatureLabel}>{PLAN_DETAILS[subscription].price}</Text>
-              {PLAN_DETAILS[subscription].features.map((feat, i) => (
-                <View key={i} style={styles.upgradeFeatureRow}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                  <Text style={styles.upgradeFeatureLabel}>{feat}</Text>
-                </View>
-              ))}
-              <GhostButton label="Manage Subscription" onPress={() => openPaywall()} style={styles.plansBtn} />
-            </GlassCard>
-          ) : (
-            <GlassCard style={styles.upgradeBanner}>
-              <GoldBadge label="PREMIUM" />
-              <Text style={styles.upgradeTitle}>Unlock the Full Experience</Text>
-              <View style={styles.upgradeFeatures}>
-                {[
-                  { icon: 'flash-outline', label: 'Unlimited: $3.99/mo' },
-                  { icon: 'star-outline', label: 'Plus: $8.99/mo — Coach + Reports' },
-                  { icon: 'heart-outline', label: 'Couples: $14.99/mo — Partner Mode' },
-                  { icon: 'diamond-outline', label: 'Lifetime: $79.99 — Pay once' },
-                ].map((f, i) => (
-                  <View key={i} style={styles.upgradeFeatureRow}>
-                    <Ionicons name={f.icon as any} size={18} color={colors.accent_gold} />
-                    <Text style={styles.upgradeFeatureLabel}>{f.label}</Text>
-                  </View>
-                ))}
-              </View>
-              <GradientButton label="See Plans" onPress={() => openPaywall()} />
-              <GhostButton label="Or buy individual reports" onPress={() => openPaywall('addons')} style={styles.plansBtn} />
-            </GlassCard>
-          )}
-
           <SectionTitle title="My Creations" />
           {savedCreations.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
@@ -403,10 +506,33 @@ export default function ProfileScreen() {
             </GlassCard>
           ) : (
             <>
+              {selectionActive && (
+                <View style={styles.selectionBar}>
+                  <Text style={styles.selectionText}>{selectedCreationIds.length} selected</Text>
+                  <TouchableOpacity style={styles.selectionAction} onPress={clearCreationSelection}>
+                    <Text style={styles.selectionActionText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.selectionAction} onPress={handleBulkDeleteCreations}>
+                    <Text style={[styles.selectionActionText, styles.selectionDeleteText]}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               {displayedCreations.map((creation) => (
-                <GlassCard key={creation.id} style={styles.creationCard}>
+                <TouchableOpacity
+                  key={creation.id}
+                  activeOpacity={0.85}
+                  onLongPress={() => startCreationSelection(creation.id)}
+                  onPress={() => {
+                    if (selectionActive) toggleCreationSelection(creation.id);
+                  }}
+                >
+                <GlassCard style={[styles.creationCard, selectedCreationIds.includes(creation.id) && styles.creationCardSelected]}>
                   <View style={styles.creationLeft}>
-                    <Ionicons name={(TOOL_ICONS[creation.type] || 'create-outline') as any} size={18} color={colors.accent_violet} />
+                    <Ionicons
+                      name={(selectedCreationIds.includes(creation.id) ? 'checkmark-circle' : (TOOL_ICONS[creation.type] || 'create-outline')) as any}
+                      size={18}
+                      color={selectedCreationIds.includes(creation.id) ? colors.accent_rose : colors.accent_violet}
+                    />
                     <Text style={styles.creationType}>{creation.type}</Text>
                   </View>
                   <View style={styles.creationCenter}>
@@ -417,19 +543,25 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                   <TouchableOpacity
+                    disabled={selectionActive}
                     onPress={() => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      Alert.alert('Options', '', [
-                        { text: 'Copy', onPress: () => handleCopyCreation(creation.content) },
-                        { text: 'Share', onPress: () => handleShareCreation(creation.content, creation.type) },
-                        { text: 'Delete', style: 'destructive', onPress: () => handleDeleteCreation(creation.id) },
-                        { text: 'Cancel', style: 'cancel' },
-                      ]);
+                      alert({
+                        title: 'Options',
+                        icon: 'ellipsis-horizontal',
+                        buttons: [
+                          { text: 'Copy', onPress: () => handleCopyCreation(creation.content) },
+                          { text: 'Share', onPress: () => handleShareCreation(creation.content, creation.type) },
+                          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteCreation(creation.id) },
+                          { text: 'Cancel', style: 'cancel' },
+                        ],
+                      });
                     }}
                   >
                     <Ionicons name="ellipsis-horizontal" size={20} color={colors.text_muted} />
                   </TouchableOpacity>
                 </GlassCard>
+                </TouchableOpacity>
               ))}
               {savedCreations.length > 5 && (
                 <GhostButton
@@ -444,34 +576,26 @@ export default function ProfileScreen() {
           <GoldDivider style={styles.divider} />
 
           <Text style={styles.themeSectionTitle}>Appearance</Text>
-          <View style={styles.themeRow}>
-            <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={colors.text_secondary} />
-            <Text style={styles.themeLabel}>Theme</Text>
-            <View style={styles.themePillRow}>
-              {THEME_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  onPress={() => { setThemeMode(opt.value); void Haptics.selectionAsync(); }}
-                  style={[styles.themePill, mode === opt.value && styles.themePillActive]}
-                >
-                  <Text style={[styles.themePillText, mode === opt.value && styles.themePillTextActive]}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          <TouchableOpacity
+            onPress={() => { setThemeSheetVisible(true); void Haptics.selectionAsync(); }}
+            style={styles.settingsRow}
+            activeOpacity={0.7}
+          >
+            <Ionicons name={currentTheme.icon as any} size={20} color={colors.accent_violet} />
+            <Text style={styles.settingsLabel}>Theme</Text>
+            <Text style={styles.themeCurrentHint}>{currentTheme.label}</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
+          </TouchableOpacity>
 
-          {renderSettingsRow('people-outline', 'Partner Mode', () => {
-            if (subscription === 'premium_couples') {
-              Alert.alert('Partner Mode', 'Partner Mode is active! You can share daily prompts with your partner.');
-            } else {
-              openPaywall();
-            }
-          }, subscription === 'premium_couples' ? 'ACTIVE' : 'COUPLES')}
+          {renderSettingsRow('people-outline', 'Two-Player Prompts', handleTwoPlayerInfo)}
           {renderSettingsRow('notifications-outline', 'Notification Preferences', handleNotificationPrefs)}
-          {renderSettingsRow('language-outline', 'Language', handleLanguage)}
+          {renderSettingsRow('language-outline', 'Language', handleLanguage, 'Soon')}
           {renderSettingsRow('star-outline', 'Rate Love Test AI', handleRateApp)}
           {renderSettingsRow('shield-outline', 'Privacy Policy', handlePrivacyPolicy)}
-          {renderSettingsRow('log-out-outline', 'Sign Out', handleSignOut, undefined, true)}
+          {account
+            ? renderSettingsRow('log-out-outline', 'Sign Out of Account', handleSignOutAccount, undefined, true)
+            : renderSettingsRow('logo-google', 'Sign in with Google', handleSignIn)}
+          {renderSettingsRow('refresh-outline', 'Reset App Data', handleResetApp, undefined, true)}
 
           <Text style={styles.footer}>
             Love Test AI is for personal growth and entertainment. Not a licensed counselling service.
@@ -530,6 +654,44 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <FeedbackModal visible={feedbackVisible} onClose={() => setFeedbackVisible(false)} />
+
+      <Modal visible={themeSheetVisible} transparent animationType="slide" onRequestClose={() => setThemeSheetVisible(false)}>
+        <TouchableOpacity
+          style={styles.themeSheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setThemeSheetVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.themeSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.themeSheetHandle} />
+            <Text style={styles.themeSheetTitle}>Choose theme</Text>
+            {THEME_OPTIONS.map((opt) => {
+              const active = mode === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.themeOption, active && styles.themeOptionActive]}
+                  onPress={() => {
+                    setThemeMode(opt.value);
+                    void Haptics.selectionAsync();
+                    setThemeSheetVisible(false);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.themeOptionIconWrap}>
+                    <Ionicons name={opt.icon as any} size={22} color={active ? colors.accent_rose : colors.accent_violet} />
+                  </View>
+                  <View style={styles.themeOptionBody}>
+                    <Text style={styles.themeOptionLabel}>{opt.label}</Text>
+                    <Text style={styles.themeOptionDesc}>{opt.description}</Text>
+                  </View>
+                  {active && <Ionicons name="checkmark-circle" size={22} color={colors.accent_rose} />}
+                </TouchableOpacity>
+              );
+            })}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </ScreenBackground>
   );
 }

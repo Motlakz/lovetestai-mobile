@@ -15,8 +15,6 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { fontSizes, spacing } from '@/constants/theme';
-import GlassCard from './GlassCard';
-import GoldBadge from './GoldBadge';
 import { useApp } from '@/context/AppContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -34,7 +32,6 @@ interface MenuItem {
   label: string;
   route?: string;
   action?: () => void;
-  badge?: string;
   section: string;
 }
 
@@ -42,7 +39,7 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();
-  const { profile, isPremium, hasCouples, subscription, openPaywall, PLAN_DETAILS } = useApp();
+  const { profile } = useApp();
 
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -73,10 +70,8 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
     { id: 'home', icon: 'home-outline', label: 'Home', route: '/(tabs)/(home)', section: 'main' },
     { id: 'tests', icon: 'heart-outline', label: 'Tests', route: '/(tabs)/tests', section: 'main' },
     { id: 'daily', icon: 'calendar-outline', label: 'Daily Prompts', route: '/(tabs)/daily', section: 'main' },
-    { id: 'coach', icon: 'chatbubble-outline', label: 'AI Coach', route: '/(tabs)/coach', section: 'main' },
-    { id: 'partner', icon: 'people-outline', label: 'Partner Mode', route: '/partner-dashboard', badge: hasCouples ? undefined : 'COUPLES', section: 'features' },
+    { id: 'partner', icon: 'happy-outline', label: 'Two-Player Prompts', route: '/(tabs)/partner', section: 'features' },
     { id: 'feedback', icon: 'star-outline', label: 'Rate Experience', action: () => { onClose(); setTimeout(onOpenFeedback, 300); }, section: 'features' },
-    { id: 'plans', icon: 'diamond-outline', label: 'Subscription Plans', action: () => { onClose(); setTimeout(() => openPaywall(), 300); }, section: 'features' },
     { id: 'profile', icon: 'person-outline', label: 'My Profile', route: '/(tabs)/profile', section: 'account' },
   ];
 
@@ -91,23 +86,14 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
           <TouchableOpacity
             key={item.id}
             onPress={() => {
-              if (item.action) {
-                item.action();
-              } else if (item.route) {
-                if (item.id === 'partner' && !hasCouples) {
-                  onClose();
-                  setTimeout(() => openPaywall(), 300);
-                } else {
-                  handleNavigate(item.route);
-                }
-              }
+              if (item.action) item.action();
+              else if (item.route) handleNavigate(item.route);
             }}
             style={[styles.menuItem, { borderBottomColor: colors.glass_border }]}
             activeOpacity={0.7}
           >
             <Ionicons name={item.icon as any} size={20} color={colors.text_secondary} />
             <Text style={[styles.menuLabel, { color: colors.text_primary }]}>{item.label}</Text>
-            {item.badge && <GoldBadge label={item.badge} />}
             <Ionicons name="chevron-forward" size={16} color={colors.text_muted} />
           </TouchableOpacity>
         ))}
@@ -131,11 +117,6 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
           </LinearGradient>
           <View style={styles.headerInfo}>
             <Text style={[styles.headerName, { color: colors.text_primary }]}>{profile.name || 'Love Test AI User'}</Text>
-            {isPremium ? (
-              <Text style={[styles.headerPlan, { color: colors.text_gold }]}>{PLAN_DETAILS[subscription].label}</Text>
-            ) : (
-              <Text style={[styles.headerPlan, { color: colors.text_muted }]}>Free Plan</Text>
-            )}
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color={colors.text_muted} />
@@ -146,16 +127,6 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
           {renderSection('main', 'NAVIGATION')}
           {renderSection('features', 'FEATURES')}
           {renderSection('account', 'ACCOUNT')}
-
-          {!isPremium && (
-            <View style={styles.upgradeSection}>
-              <GlassCard style={styles.upgradeCard}>
-                <Ionicons name="sparkles" size={20} color={colors.accent_gold} />
-                <Text style={[styles.upgradeText, { color: colors.text_primary }]}>Unlock Premium</Text>
-                <Text style={[styles.upgradeDesc, { color: colors.text_secondary }]}>From $3.99/mo</Text>
-              </GlassCard>
-            </View>
-          )}
         </ScrollView>
       </Animated.View>
     </View>

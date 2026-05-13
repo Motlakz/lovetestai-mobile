@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,7 +51,7 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     featureArrow: { position: 'absolute' as const, bottom: spacing.md, right: spacing.md },
     quickActionsRow: { flexDirection: 'row' as const, gap: spacing.sm, marginBottom: spacing.xl },
     quickAction: { flex: 1, padding: spacing.md, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm },
-    quickActionLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const, flex: 1 },
+    quickActionLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const },
     partnerBanner: { padding: spacing.xl, marginBottom: spacing.xl, gap: spacing.md, overflow: 'hidden' as const },
     partnerGradient: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.xl, opacity: 0.1 },
     partnerTitle: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '600' as const },
@@ -73,14 +72,11 @@ export default function HomeScreen() {
     { id: 'love-poem', icon: 'book-outline', label: 'Love Poem', description: 'Craft a romantic poem', gradient: [colors.grad_violet_start, colors.grad_violet_end], route: '/create-mode?tool=love-poem' },
     { id: 'love-note', icon: 'chatbox-outline', label: 'Love Note', description: 'A quick, genuine note', gradient: [colors.accent_rose, colors.grad_violet_end], route: '/create-mode?tool=love-note' },
     { id: 'love-quote', icon: 'text-outline', label: 'Love Quote', description: 'Generate a shareable quote', gradient: [colors.grad_gold_start, colors.grad_gold_end], route: '/create-mode?tool=love-quote' },
-    { id: 'date-ideas', icon: 'location-outline', label: 'Date Ideas', description: 'Coming later as sponsored inspiration', gradient: [colors.success, '#2E9E96'], badge: 'SOON' },
-    { id: 'conversation-starters', icon: 'people-outline', label: 'Starters', description: 'Coming later as HeartLoop teasers', gradient: [colors.accent_violet, colors.accent_rose], badge: 'SOON' },
   ], [colors]);
 
   const handleFeaturePress = useCallback((feature: FeatureCard) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (feature.route) router.push(feature.route as any);
-    else Alert.alert('Coming Soon', 'This will become a light sponsored teaser later.');
   }, [router]);
 
   const scaleAnims = useRef(FEATURES.map(() => new Animated.Value(1))).current;
@@ -106,7 +102,7 @@ export default function HomeScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.greetingSection}>
             <Text style={styles.greeting}>{greeting}{profile.name ? `, ${profile.name}` : ''}</Text>
-            <Text style={styles.greetingSub}>Create something, take a test, or save a private prompt.</Text>
+            <Text style={styles.greetingSub}>Write a letter to your loved one, test your compatibility, or find some love prompts.</Text>
           </View>
 
           <SectionTitle title="Create Something Beautiful" />
@@ -139,14 +135,14 @@ export default function HomeScreen() {
 
           <SectionTitle title="Quick Actions" />
           <View style={styles.quickActionsRow}>
-            <TouchableOpacity onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/tests' as any); }} activeOpacity={0.8}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/tests' as any); }} activeOpacity={0.8}>
               <GlassCard style={styles.quickAction}>
                 <Ionicons name="heart-outline" size={18} color={colors.accent_rose} />
                 <Text style={styles.quickActionLabel}>Take a Test</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.text_muted} />
               </GlassCard>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/daily' as any); }} activeOpacity={0.8}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/daily' as any); }} activeOpacity={0.8}>
               <GlassCard style={styles.quickAction}>
                 <Ionicons name="calendar-outline" size={18} color={colors.accent_violet} />
                 <Text style={styles.quickActionLabel}>Daily Prompt</Text>
@@ -158,7 +154,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              Alert.alert('Coming Soon', 'A lighter invite-only prompt mode will come later.');
+              router.push('/(tabs)/partner' as any);
             }}
             activeOpacity={0.8}
           >
@@ -169,9 +165,8 @@ export default function HomeScreen() {
                   <View style={{ flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm }}>
                     <Ionicons name="happy-outline" size={22} color={colors.accent_rose} />
                     <Text style={styles.partnerTitle}>Two-Player Prompts</Text>
-                    <GoldBadge label="SOON" />
                   </View>
-                  <Text style={styles.partnerDesc}>A lighter shared prompt mode is planned. Love Test AI stays free and local-first.</Text>
+                  <Text style={styles.partnerDesc}>Send a prompt to someone and compare reflections together.</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={22} color={colors.text_muted} />
               </View>

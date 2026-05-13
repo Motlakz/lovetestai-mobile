@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
@@ -119,17 +119,14 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="coach"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
           name="partner"
           options={{
             title: 'Pair',
             tabBarIcon: ({ color, focused }) => (
-              <TabIcon name="happy-outline" activeName="happy" color={color} focused={focused} activeColor={colors.accent_rose} />
+              <View style={styles.iconContainer}>
+                <FontAwesome5 name="grin-hearts" size={20} color={color} solid={focused} />
+                {focused && <View style={[styles.activeDot, { backgroundColor: colors.accent_rose }]} />}
+              </View>
             ),
           }}
         />

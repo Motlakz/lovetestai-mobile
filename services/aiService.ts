@@ -1,3 +1,5 @@
+import { zodiacLocal, birthdateLocal, loveScoreLocal, numerologyLocal, soulmateLocal, quizLocal } from './localEngine';
+
 const PLATFORM_API_BASE =
   process.env.EXPO_PUBLIC_LOVETESTAI_API_BASE_URL?.replace(/\/$/, '') ||
   'https://lovetestai.com';
@@ -6,6 +8,7 @@ const CONTENT_ROUTES: Partial<Record<string, string>> = {
   'love-letter': '/api/generate-letter',
   'love-note': '/api/generate-note',
   'love-poem': '/api/generate-poem',
+  'love-quote': '/api/generate-quote',
 };
 
 export interface GenerateParams {
@@ -25,6 +28,12 @@ export interface GenerateParams {
   stage?: string;
 }
 
+export interface PlatformPrompt {
+  id: string;
+  text: string;
+  category: string;
+}
+
 interface PlatformGenerationResponse {
   content?: string;
   text?: string;
@@ -37,6 +46,7 @@ interface PlatformGenerationResponse {
   analysis?: string;
   insight?: string;
   message?: string;
+  // generate-quote API returns { quote: string }
   data?: {
     content?: string;
     text?: string;
@@ -96,6 +106,23 @@ async function postToPlatform(route: string, body: unknown): Promise<string | nu
   return getResponseText(data);
 }
 
+export async function fetchPrompts(category = 'All', limit = 30): Promise<PlatformPrompt[] | null> {
+  try {
+    const url = new URL(`${PLATFORM_API_BASE}/api/prompts`);
+    url.searchParams.set('category', category);
+    url.searchParams.set('limit', String(limit));
+    const response = await fetch(url.toString(), {
+      headers: { 'x-client': 'lovetestai-mobile' },
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { prompts?: PlatformPrompt[] };
+    return Array.isArray(data.prompts) ? data.prompts : null;
+  } catch (error) {
+    console.log('[AI] Prompts route failed:', error);
+    return null;
+  }
+}
+
 export async function generateContent(params: GenerateParams): Promise<string> {
   const route = CONTENT_ROUTES[params.tool];
 
@@ -120,20 +147,33 @@ function buildContentPayload(params: GenerateParams): Record<string, unknown> {
     return {
       name1,
       name2,
-      theme: params.detail || params.memory || params.word || params.tone || 'romantic',
-      poemLength: params.length === 'Long' ? 24 : params.length === 'Short' ? 8 : 14,
+      theme: params.detail || params.memory || params.word || params.tone || params.occasion || 'romantic',
+      poemLength: params.length === 'Long' ? 8 : params.length === 'Short' ? 3 : 5,
       rhyming: params.style === 'Rhyming',
+      recaptchaToken: 'mobile',
       source: 'mobile',
     };
   }
 
   if (params.tool === 'love-note') {
     return {
-      name1,
-      name2,
-      tone: params.tone,
-      message: params.message || params.detail || params.memory,
-      occasion: params.occasion,
+      sender: name1,
+      recipient: name2,
+      occasion: params.occasion || 'just because',
+      vibe: params.tone || 'romantic and heartfelt',
+      detail: params.message || params.detail || params.memory || '',
+      withEmoji: false,
+      rhyming: false,
+      recaptchaToken: 'mobile',
+      source: 'mobile',
+    };
+  }
+
+  if (params.tool === 'love-quote') {
+    return {
+      word: params.word || '',
+      tone: toneToQuoteTone(params.tone),
+      recaptchaToken: 'mobile',
       source: 'mobile',
     };
   }
@@ -150,6 +190,14 @@ function buildContentPayload(params: GenerateParams): Record<string, unknown> {
   };
 }
 
+function toneToQuoteTone(tone?: string): string {
+  const value = (tone || '').toLowerCase();
+  if (value.includes('playful') || value.includes('flirty')) return 'playful';
+  if (value.includes('poetic') || value.includes('dreamy')) return 'poetic';
+  if (value.includes('sincere') || value.includes('simple') || value.includes('tender')) return 'sincere';
+  return 'romantic';
+}
+
 export async function analyzeLoveCompatibility(
   person1: string,
   person2: string,
@@ -158,15 +206,14 @@ export async function analyzeLoveCompatibility(
   score: number,
   recaptchaToken?: string
 ): Promise<{ result: string; adjustedScore: number }> {
-  const data = await postJson<{ result: string; adjustedScore?: number }>('/api/analyze-compatibility', {
-    person1,
-    person2,
-    loveLanguage1,
-    loveLanguage2,
-    score,
-    recaptchaToken,
-  });
-  return { result: data.result, adjustedScore: data.adjustedScore ?? score };
+  try {
+    const data = await postJson<{ result: string; adjustedScore?: number }>('/api/analyze-compatibility', {
+      person1, person2, loveLanguage1, loveLanguage2, score, recaptchaToken,
+    });
+    return { result: data.result, adjustedScore: data.adjustedScore ?? score };
+  } catch {
+    return quizLocal(loveLanguage1, loveLanguage2, score);
+  }
 }
 
 export async function calculateLoveScore(
@@ -176,7 +223,11 @@ export async function calculateLoveScore(
   duration: string,
   recaptchaToken?: string
 ): Promise<{ score: number; insight: string; message: string }> {
-  return postJson('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
+  try {
+    return await postJson('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
+  } catch {
+    return loveScoreLocal(name1, name2, relationshipStatus, duration);
+  }
 }
 
 export async function calculateZodiacCompatibility(
@@ -184,7 +235,11 @@ export async function calculateZodiacCompatibility(
   sign2: string,
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
-  return postJson('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
+  try {
+    return await postJson('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
+  } catch {
+    return zodiacLocal(sign1, sign2);
+  }
 }
 
 export async function calculateBirthdateCompatibility(
@@ -192,7 +247,11 @@ export async function calculateBirthdateCompatibility(
   date2: string,
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
-  return postJson('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
+  try {
+    return await postJson('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
+  } catch {
+    return birthdateLocal(date1, date2);
+  }
 }
 
 export async function calculateNumerology(
@@ -202,7 +261,11 @@ export async function calculateNumerology(
   date2: string,
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
-  return postJson('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
+  try {
+    return await postJson('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
+  } catch {
+    return numerologyLocal(name1, name2, date1, date2);
+  }
 }
 
 export async function findSoulmate(data: {
@@ -213,7 +276,11 @@ export async function findSoulmate(data: {
   loveLanguage: string;
   recaptchaToken?: string;
 }): Promise<{ analysis: string; traits: string[] }> {
-  return postJson('/api/soulmate-finder', data);
+  try {
+    return await postJson('/api/soulmate-finder', data);
+  } catch {
+    return soulmateLocal(data.name, data.zodiacSign, data.interests, data.loveLanguage);
+  }
 }
 
 export async function generatePoem(

@@ -62,6 +62,7 @@ export default function GradientButton({ label, onPress, style, disabled, small,
 
 const styles = StyleSheet.create({
   gradient: {
+    marginTop: spacing.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing['2xl'],
     borderRadius: radius.full,

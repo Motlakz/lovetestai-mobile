@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
-  Alert,
   Modal,
   Linking,
   Share,
@@ -15,7 +14,26 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import {
+  Feather,
+  Flame,
+  Flower2,
+  Heart,
+  Leaf,
+  Mail,
+  Moon,
+  Orbit,
+  Shell,
+  Sparkles,
+  Sun,
+  Waves,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
@@ -24,7 +42,6 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import GlassCard from '@/components/ui/GlassCard';
 import GradientButton from '@/components/ui/GradientButton';
 import GhostButton from '@/components/ui/GhostButton';
-import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
 import SectionTitle from '@/components/ui/SectionTitle';
 import InputField from '@/components/ui/InputField';
@@ -32,22 +49,71 @@ import LoadingPulse from '@/components/ui/LoadingPulse';
 import HeartParticles from '@/components/ui/HeartParticles';
 import { useApp } from '@/context/AppContext';
 import { generateContent } from '@/services/aiService';
+import { useToast } from '@/components/ui/Toast';
+import { useAppAlert } from '@/components/ui/AppAlertModal';
+import {
+  buildViralCreationShareText,
+  getDefaultTemplateForTool,
+  getTemplatesForTool,
+  type CreationTemplateId,
+} from '@/services/creationTemplates';
 
 const TOOL_META: Record<string, { title: string; icon: string; subtitle: string; cta: string }> = {
   'love-letter': { title: 'Love Letter', icon: 'mail-outline', subtitle: 'Write a heartfelt, deeply personal letter', cta: 'Write the Letter' },
   'love-poem': { title: 'Love Poem', icon: 'book-outline', subtitle: 'Craft a beautiful romantic poem', cta: 'Create the Poem' },
   'love-note': { title: 'Love Note', icon: 'chatbox-outline', subtitle: 'A quick, genuine love note', cta: 'Craft the Note' },
   'love-quote': { title: 'Love Quote', icon: 'text-outline', subtitle: 'Generate an original love quote', cta: 'Generate a Quote' },
-  'date-ideas': { title: 'Date Ideas', icon: 'location-outline', subtitle: 'Get creative, personalised date suggestions', cta: 'Find Date Ideas' },
-  'conversation-starters': { title: 'Conversation Starters', icon: 'people-outline', subtitle: 'Meaningful openers for deeper connection', cta: 'Get Starters' },
 };
 
-const TONES = ['Romantic', 'Playful', 'Sincere', 'Poetic'];
+const VIBES = [
+  'romantic and heartfelt',
+  'playful and flirty',
+  'poetic and dreamy',
+  'sweet and simple',
+  'passionate and intense',
+  'nostalgic and tender',
+];
 const LENGTHS = ['Short', 'Medium', 'Long'];
-const OCCASIONS = ['Birthday', 'Anniversary', 'Just Because', 'First Valentine'];
+const OCCASIONS = [
+  'just because',
+  "valentine's day",
+  'anniversary',
+  'long distance',
+  'apology',
+  'missing you',
+  'good morning',
+  'good night',
+];
 const POEM_STYLES = ['Rhyming', 'Free Verse', 'Haiku', 'Sonnet'];
-const VIBES = ['Cozy', 'Adventurous', 'Romantic', 'Budget-Friendly'];
-const STAGES = ['New Together', 'Dating', 'Long-Term', 'Married'];
+const FONT_OPTIONS = [
+  { label: 'Cormorant', family: 'CormorantGaramond_600SemiBold' },
+  { label: 'Playfair', family: 'PlayfairDisplay_600SemiBold' },
+  { label: 'DM Sans', family: 'DMSans_500Medium' },
+];
+const SIZE_OPTIONS = [
+  { label: 'Small', value: 0.9 },
+  { label: 'Medium', value: 1 },
+  { label: 'Large', value: 1.15 },
+];
+
+const GLYPH_ICONS: Record<string, LucideIcon> = {
+  feather: Feather,
+  flame: Flame,
+  flower: Flower2,
+  heart: Heart,
+  leaf: Leaf,
+  mail: Mail,
+  moon: Moon,
+  planet: Orbit,
+  rose: Flower2,
+  sparkle: Sparkles,
+  sunny: Sun,
+  water: Waves,
+};
+
+function formatChoiceLabel(value: string): string {
+  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 function createStyles(c: ThemeColors, _s: ThemeShadows) {
   return StyleSheet.create({
@@ -76,17 +142,26 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     exportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' as const },
     exportSheet: { backgroundColor: c.bg_surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: c.glass_border, borderBottomWidth: 0 },
     exportHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.glass_border, alignSelf: 'center' as const, marginTop: spacing.md },
-    exportContent: { padding: spacing.xl, gap: spacing.lg },
+    exportContent: { paddingTop: spacing.lg, paddingHorizontal: spacing.xl, gap: spacing.md },
     exportTitle: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '600' as const, textAlign: 'center' as const },
     exportPreview: { backgroundColor: c.bg_elevated, borderRadius: radius.lg, padding: spacing.xl, borderWidth: 1, borderColor: c.glass_border, borderLeftWidth: 3, borderLeftColor: c.accent_gold, paddingLeft: spacing.lg },
     exportPreviewText: { color: c.text_primary, fontSize: fontSizes.sm, lineHeight: 22, maxHeight: 120 },
+    templatePreview: { borderRadius: radius.xl, padding: spacing.xl, minHeight: 260, justifyContent: 'space-between' as const, overflow: 'hidden' as const },
+    templateGlyph: { position: 'absolute' as const },
+    templateBadge: { alignSelf: 'flex-start' as const, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+    templateBadgeText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
+    templateBody: { lineHeight: 30, fontWeight: '600' as const, marginVertical: spacing.xl },
+    templateFooter: { fontSize: fontSizes.xs, fontWeight: '600' as const, letterSpacing: 1.2, textTransform: 'uppercase' as const },
+    templateRow: { flexDirection: 'row' as const, gap: spacing.sm },
+    templateChip: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' as const },
+    templateChipText: { fontSize: fontSizes.xs, fontWeight: '600' as const },
     exportWatermark: { fontSize: fontSizes.xs, color: c.text_muted, textAlign: 'right' as const, marginTop: spacing.md, fontStyle: 'italic' as const },
     exportOptionRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: c.glass_border },
     exportOptionLabel: { flex: 1, fontSize: fontSizes.base, color: c.text_primary },
     exportLockedRow: { position: 'relative' as const, overflow: 'hidden' as const, borderRadius: radius.md },
     exportLockedInner: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, paddingHorizontal: spacing.md, gap: spacing.md, opacity: 0.4 },
     exportLockedBadge: { position: 'absolute' as const, right: spacing.md, top: spacing.lg },
-    exportCloseBtn: { marginTop: spacing.sm },
+    exportCloseBtn: { marginTop: 0 },
   });
 }
 
@@ -96,58 +171,63 @@ export default function CreateModeScreen() {
   const { tool } = useLocalSearchParams<{ tool: string }>();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { generationsRemaining, incrementGenerations, saveCreation, profile, isPremium, canGenerate, hasPremiumExport, openPaywall, purchaseIAP } = useApp();
+  const { saveCreation, profile } = useApp();
+  const toast = useToast();
+  const { alert } = useAppAlert();
 
   const meta = TOOL_META[tool || 'love-letter'] || TOOL_META['love-letter'];
 
   const [toName, setToName] = useState('');
   const [fromName, setFromName] = useState(profile.name || '');
-  const [tone, setTone] = useState('Romantic');
+  const [tone, setTone] = useState('romantic and heartfelt');
   const [length, setLength] = useState('Medium');
   const [detail, setDetail] = useState('');
-  const [occasion, setOccasion] = useState('Just Because');
+  const [occasion, setOccasion] = useState('just because');
   const [poemStyle, setPoemStyle] = useState('Free Verse');
   const [memory, setMemory] = useState('');
   const [message, setMessage] = useState('');
   const [word, setWord] = useState('');
-  const [city, setCity] = useState('');
-  const [vibe, setVibe] = useState('Romantic');
-  const [stage, setStage] = useState('Dating');
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [showExportSheet, setShowExportSheet] = useState(false);
+  const defaultTemplate = useMemo(() => getDefaultTemplateForTool(tool || 'love-letter'), [tool]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<CreationTemplateId>(defaultTemplate.id);
+  const [selectedFontFamily, setSelectedFontFamily] = useState(FONT_OPTIONS[0].family);
+  const [selectedSizeScale, setSelectedSizeScale] = useState(SIZE_OPTIONS[1].value);
 
   const resultAnim = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
+  const exportShotRef = useRef<ViewShot | null>(null);
   const selectedTool = tool || 'love-letter';
+  const availableTemplates = useMemo(() => getTemplatesForTool(selectedTool), [selectedTool]);
+  const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) ?? defaultTemplate;
+
+  useEffect(() => {
+    setSelectedTemplateId(defaultTemplate.id);
+  }, [defaultTemplate.id]);
 
   const handleGenerate = useCallback(async () => {
-    if (generationsRemaining <= 0) {
-      openPaywall();
-      return;
-    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
     setShowResult(false);
     resultAnim.setValue(0);
     try {
       const content = await generateContent(
-        { tool: selectedTool, fromName, toName, tone, length, detail, occasion, style: poemStyle, memory, message, word, city, vibe, stage }
+        { tool: selectedTool, fromName, toName, tone, length, detail, occasion, style: poemStyle, memory, message, word }
       );
       setResult(content);
-      incrementGenerations();
       setShowResult(true);
       Animated.spring(resultAnim, { toValue: 1, useNativeDriver: true, damping: 15 }).start();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 300);
     } catch (error) {
       console.log('Generation error:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, city, vibe, stage, generationsRemaining, incrementGenerations, resultAnim, openPaywall]);
+  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast]);
 
   const handleCopy = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -156,14 +236,14 @@ export default function CreateModeScreen() {
     } else {
       await Clipboard.setStringAsync(result);
     }
-    Alert.alert('Copied', 'Content copied to clipboard');
-  }, [result]);
+    toast.success('Content copied to clipboard');
+  }, [result, toast]);
 
   const handleSave = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     saveCreation({ id: Date.now().toString(), type: meta.title, content: result, toName, createdAt: new Date().toISOString() });
-    Alert.alert('Saved', 'Your creation has been saved to your profile.');
-  }, [result, meta.title, toName, saveCreation]);
+    toast.success('Saved to your profile.');
+  }, [result, meta.title, toName, saveCreation, toast]);
 
   const handleRegenerate = useCallback(() => {
     setShowResult(false);
@@ -173,14 +253,19 @@ export default function CreateModeScreen() {
 
   const handleExportShare = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const shareText = `${meta.title}\n\n${result}\n\n-- Created with Love Test AI`;
+    const shareText = buildViralCreationShareText({
+      type: meta.title,
+      content: result,
+      toName,
+      templateName: selectedTemplate.name,
+    });
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.share) {
           await navigator.share({ title: meta.title, text: shareText });
         } else {
           try { await navigator.clipboard.writeText(shareText); } catch { console.log('Share copy failed'); }
-          Alert.alert('Copied', 'Text copied to clipboard.');
+          toast.success('Text copied to clipboard.');
         }
       } else {
         await Share.share({ message: shareText, title: meta.title });
@@ -189,11 +274,16 @@ export default function CreateModeScreen() {
       if (error?.message !== 'User did not share') console.log('Share error:', error);
     }
     setShowExportSheet(false);
-  }, [result, meta.title]);
+  }, [result, meta.title, selectedTemplate.name, toast, toName]);
 
   const handleWhatsAppShare = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const shareText = `${meta.title}\n\n${result}\n\n-- Created with Love Test AI`;
+    const shareText = buildViralCreationShareText({
+      type: meta.title,
+      content: result,
+      toName,
+      templateName: selectedTemplate.name,
+    });
     const encoded = encodeURIComponent(shareText);
     const url = `whatsapp://send?text=${encoded}`;
     try {
@@ -203,23 +293,78 @@ export default function CreateModeScreen() {
       } else if (Platform.OS === 'web') {
         await Linking.openURL(`https://wa.me/?text=${encoded}`);
       } else {
-        Alert.alert('WhatsApp not found', 'Text copied to clipboard instead.');
         await Clipboard.setStringAsync(shareText);
+        alert({ title: 'WhatsApp not found', message: 'Text copied to clipboard instead.', icon: 'logo-whatsapp' });
       }
     } catch (error) { console.log('WhatsApp share error:', error); }
     setShowExportSheet(false);
-  }, [result, meta.title]);
+  }, [result, meta.title, alert, selectedTemplate.name, toName]);
 
   const handleExportCopy = useCallback(async () => {
     await handleCopy();
     setShowExportSheet(false);
   }, [handleCopy]);
 
-  const renderPillSelector = (options: string[], selected: string, onSelect: (v: string) => void) => (
+  const captureTemplateImage = useCallback(async () => {
+    if (!exportShotRef.current) {
+      throw new Error('Export preview is not ready.');
+    }
+    return await captureRef(exportShotRef.current, {
+      format: 'png',
+      quality: 1,
+      result: 'tmpfile',
+    });
+  }, []);
+
+  const handleShareSnapshot = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const uri = await captureTemplateImage();
+      if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: `Share ${meta.title}`,
+          UTI: 'public.png',
+        });
+      } else {
+        toast.info('Image sharing is not available on this device.');
+      }
+      setShowExportSheet(false);
+    } catch (error) {
+      console.log('Snapshot share failed:', error);
+      toast.error('Could not create the image export.');
+    }
+  }, [captureTemplateImage, meta.title, toast]);
+
+  const handleDownloadSnapshot = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const uri = await captureTemplateImage();
+      if (Platform.OS === 'web') {
+        toast.info('Use Share Image on web to export this card.');
+        return;
+      }
+
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        toast.warning('Photo permission is needed to save the image.');
+        return;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      toast.success('Image saved to your gallery.');
+      setShowExportSheet(false);
+    } catch (error) {
+      console.log('Snapshot save failed:', error);
+      toast.error('Could not save the image export.');
+    }
+  }, [captureTemplateImage, toast]);
+
+  const renderPillSelector = (options: string[], selected: string, onSelect: (v: string) => void, formatter = (v: string) => v) => (
     <View style={styles.pillRow}>
       {options.map((opt) => (
         <TouchableOpacity key={opt} onPress={() => { onSelect(opt); void Haptics.selectionAsync(); }} style={[styles.pill, selected === opt && styles.pillSelected]}>
-          <Text style={[styles.pillText, selected === opt && styles.pillTextSelected]}>{opt}</Text>
+          <Text style={[styles.pillText, selected === opt && styles.pillTextSelected]}>{formatter(opt)}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -231,29 +376,24 @@ export default function CreateModeScreen() {
         return (<>
           <InputField label="What makes them special?" value={detail} onChangeText={setDetail} placeholder="Their laugh, kindness, the way they..." multiline />
           <Text style={styles.fieldLabel}>Occasion</Text>
-          {renderPillSelector(OCCASIONS, occasion, setOccasion)}
+          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
         </>);
       case 'love-poem':
         return (<>
           <InputField label="A feeling or memory to capture" value={memory} onChangeText={setMemory} placeholder="The first time we danced..." multiline />
+          <Text style={styles.fieldLabel}>Occasion</Text>
+          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
           <Text style={styles.fieldLabel}>Style</Text>
           {renderPillSelector(POEM_STYLES, poemStyle, setPoemStyle)}
         </>);
       case 'love-note':
-        return <InputField label="One thing you want to say" value={message} onChangeText={setMessage} placeholder="I'm grateful for..." />;
+        return (<>
+          <InputField label="One thing you want to say" value={message} onChangeText={setMessage} placeholder="I'm grateful for..." />
+          <Text style={styles.fieldLabel}>Occasion</Text>
+          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
+        </>);
       case 'love-quote':
         return <InputField label="Describe your love in one word" value={word} onChangeText={setWord} placeholder="Infinite, tender, electric..." />;
-      case 'date-ideas':
-        return (<>
-          <InputField label="City" value={city} onChangeText={setCity} placeholder="Paris, Tokyo, your hometown..." />
-          <Text style={styles.fieldLabel}>Vibe</Text>
-          {renderPillSelector(VIBES, vibe, setVibe)}
-        </>);
-      case 'conversation-starters':
-        return (<>
-          <Text style={styles.fieldLabel}>Relationship stage</Text>
-          {renderPillSelector(STAGES, stage, setStage)}
-        </>);
       default: return null;
     }
   };
@@ -276,18 +416,14 @@ export default function CreateModeScreen() {
           </View>
           <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <GlassCard style={styles.formPanel}>
-              {selectedTool !== 'date-ideas' && selectedTool !== 'conversation-starters' && (
-                <>
-                  <InputField label="For" value={toName} onChangeText={setToName} placeholder="Their first name" />
-                  <InputField label="From" value={fromName} onChangeText={setFromName} placeholder="Your name" />
-                </>
-              )}
-              {selectedTool !== 'date-ideas' && selectedTool !== 'conversation-starters' && (
-                <>
-                  <Text style={styles.fieldLabel}>Tone</Text>
-                  {renderPillSelector(TONES, tone, setTone)}
-                </>
-              )}
+              <>
+                <InputField label="For" value={toName} onChangeText={setToName} placeholder="Their first name" />
+                <InputField label="From" value={fromName} onChangeText={setFromName} placeholder="Your name" />
+              </>
+              <>
+                <Text style={styles.fieldLabel}>Vibe</Text>
+                {renderPillSelector(VIBES, tone, setTone, formatChoiceLabel)}
+              </>
               {(selectedTool === 'love-letter' || selectedTool === 'love-poem') && (
                 <>
                   <Text style={styles.fieldLabel}>Length</Text>
@@ -296,8 +432,7 @@ export default function CreateModeScreen() {
               )}
               {renderToolFields()}
             </GlassCard>
-            <GradientButton label={!canGenerate ? 'Unlock More Credits' : meta.cta} onPress={!canGenerate ? () => openPaywall('credits') : handleGenerate} disabled={isLoading} style={styles.generateBtn} />
-            <Text style={styles.disclaimer}>AI-powered · Free to try · Beautiful output</Text>
+            <GradientButton label={meta.cta} onPress={handleGenerate} disabled={isLoading} style={styles.generateBtn} />
             {isLoading && <LoadingPulse />}
             {showResult && result && (
               <Animated.View style={[styles.resultContainer, { opacity: resultAnim, transform: [{ translateY: resultTranslateY }] }]}>
@@ -324,17 +459,144 @@ export default function CreateModeScreen() {
       <Modal visible={showExportSheet} transparent animationType="slide" onRequestClose={() => setShowExportSheet(false)}>
         <TouchableOpacity style={styles.exportOverlay} activeOpacity={1} onPress={() => setShowExportSheet(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={[styles.exportSheet, { paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.xl }]}>
+            <View style={styles.exportSheet}>
               <View style={styles.exportHandle} />
-              <View style={styles.exportContent}>
+              <View style={[styles.exportContent, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
                 <Text style={styles.exportTitle}>Export Your Creation</Text>
-                <View style={styles.exportPreview}>
-                  <Text style={styles.exportPreviewText} numberOfLines={5}>{result}</Text>
-                  {!isPremium && <Text style={styles.exportWatermark}>Love Test AI</Text>}
+                <ViewShot ref={exportShotRef} options={{ format: 'png', quality: 1 }}>
+                  <LinearGradient colors={selectedTemplate.background as any} style={styles.templatePreview} collapsable={false}>
+                    {selectedTemplate.glyphs.map((glyph, index) => (
+                      <View
+                        key={`${glyph.symbol}-${index}`}
+                        style={[
+                          styles.templateGlyph,
+                          {
+                            left: glyph.x,
+                            top: glyph.y,
+                            opacity: glyph.opacity,
+                            transform: [{ rotate: `${glyph.rotate}deg` }],
+                          },
+                        ]}
+                      >
+                        {React.createElement(GLYPH_ICONS[glyph.symbol] ?? Shell, {
+                          size: glyph.size,
+                          color: selectedTemplate.accent,
+                          strokeWidth: 1.4,
+                        })}
+                      </View>
+                    ))}
+                    <View style={[styles.templateBadge, { backgroundColor: selectedTemplate.badge }]}>
+                      <Text style={[styles.templateBadgeText, { color: selectedTemplate.accent }]}>{meta.title}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.templateBody,
+                        {
+                          color: selectedTemplate.text,
+                          fontFamily: selectedFontFamily,
+                          fontSize: fontSizes.lg * selectedSizeScale,
+                          lineHeight: 30 * selectedSizeScale,
+                        },
+                      ]}
+                      numberOfLines={7}
+                    >
+                      {result}
+                    </Text>
+                    <Text style={[styles.templateFooter, { color: selectedTemplate.muted }]}>
+                      {toName ? `For ${toName} - ` : ''}Love Test AI
+                    </Text>
+                  </LinearGradient>
+                </ViewShot>
+                <View style={styles.templateRow}>
+                  {availableTemplates.slice(0, 4).map((template) => (
+                    <TouchableOpacity
+                      key={template.id}
+                      onPress={() => {
+                        setSelectedTemplateId(template.id);
+                        void Haptics.selectionAsync();
+                      }}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.templateChip,
+                        {
+                          borderColor: selectedTemplateId === template.id ? template.accent : colors.glass_border,
+                          backgroundColor: selectedTemplateId === template.id ? `${template.accent}1F` : colors.glass_fill,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.templateChipText, { color: selectedTemplateId === template.id ? template.accent : colors.text_secondary }]}>
+                        {template.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.templateRow}>
+                  {FONT_OPTIONS.map((font) => (
+                    <TouchableOpacity
+                      key={font.family}
+                      onPress={() => {
+                        setSelectedFontFamily(font.family);
+                        void Haptics.selectionAsync();
+                      }}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.templateChip,
+                        {
+                          borderColor: selectedFontFamily === font.family ? selectedTemplate.accent : colors.glass_border,
+                          backgroundColor: selectedFontFamily === font.family ? `${selectedTemplate.accent}1F` : colors.glass_fill,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.templateChipText,
+                          {
+                            color: selectedFontFamily === font.family ? selectedTemplate.accent : colors.text_secondary,
+                            fontFamily: font.family,
+                          },
+                        ]}
+                      >
+                        {font.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.templateRow}>
+                  {SIZE_OPTIONS.map((size) => (
+                    <TouchableOpacity
+                      key={size.label}
+                      onPress={() => {
+                        setSelectedSizeScale(size.value);
+                        void Haptics.selectionAsync();
+                      }}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.templateChip,
+                        {
+                          borderColor: selectedSizeScale === size.value ? selectedTemplate.accent : colors.glass_border,
+                          backgroundColor: selectedSizeScale === size.value ? `${selectedTemplate.accent}1F` : colors.glass_fill,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.templateChipText, { color: selectedSizeScale === size.value ? selectedTemplate.accent : colors.text_secondary }]}>
+                        {size.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
                 <TouchableOpacity style={styles.exportOptionRow} onPress={handleExportShare} activeOpacity={0.7}>
                   <Ionicons name="share-outline" size={22} color={colors.accent_violet} />
-                  <Text style={styles.exportOptionLabel}>Share</Text>
+                  <Text style={styles.exportOptionLabel}>Share Text</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.exportOptionRow} onPress={handleShareSnapshot} activeOpacity={0.7}>
+                  <Ionicons name="image-outline" size={22} color={colors.accent_violet} />
+                  <Text style={styles.exportOptionLabel}>Share Image</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.exportOptionRow} onPress={handleDownloadSnapshot} activeOpacity={0.7}>
+                  <Ionicons name="download-outline" size={22} color={colors.accent_gold} />
+                  <Text style={styles.exportOptionLabel}>Save Image</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.exportOptionRow} onPress={handleWhatsAppShare} activeOpacity={0.7}>
@@ -347,28 +609,6 @@ export default function CreateModeScreen() {
                   <Text style={styles.exportOptionLabel}>Copy Text</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
                 </TouchableOpacity>
-                {hasPremiumExport ? (
-                  <TouchableOpacity style={styles.exportOptionRow} onPress={() => { Alert.alert('Downloaded', 'Premium card saved.'); setShowExportSheet(false); }} activeOpacity={0.7}>
-                    <Ionicons name="download-outline" size={22} color={colors.accent_gold} />
-                    <Text style={styles.exportOptionLabel}>Download Premium Card</Text>
-                    <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={styles.exportLockedRow} onPress={() => {
-                    Alert.alert('Premium Card Export', 'Choose an option:', [
-                      { text: 'Single · $0.50', onPress: () => { purchaseIAP('premium_card_single'); Alert.alert('Unlocked!', 'Card unlocked.'); } },
-                      { text: 'All Styles · $0.99', onPress: () => { purchaseIAP('premium_card_all'); Alert.alert('Unlocked!', 'All styles unlocked.'); } },
-                      { text: 'See Plans', onPress: () => { setShowExportSheet(false); openPaywall(); } },
-                      { text: 'Cancel', style: 'cancel' },
-                    ]);
-                  }} activeOpacity={0.7}>
-                    <View style={styles.exportLockedInner}>
-                      <Ionicons name="download-outline" size={22} color={colors.accent_violet} />
-                      <Text style={styles.exportOptionLabel}>Download Premium Card</Text>
-                    </View>
-                    <View style={styles.exportLockedBadge}><GoldBadge label="FROM $0.50" /></View>
-                  </TouchableOpacity>
-                )}
                 <GhostButton label="Close" onPress={() => setShowExportSheet(false)} style={styles.exportCloseBtn} />
               </View>
             </View>

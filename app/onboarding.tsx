@@ -98,15 +98,7 @@ export default function OnboardingScreen() {
     else finish();
   }, [currentSlide, finish, goToSlide]);
 
-  const handleNotifications = useCallback(async () => {
-    if (Platform.OS !== 'web') {
-      try {
-        const { default: Notifications } = await import('expo-notifications');
-        await Notifications.requestPermissionsAsync();
-      } catch (e) {
-        console.log('Notification permission error:', e);
-      }
-    }
+  const handleNotifications = useCallback(() => {
     finish();
   }, [finish]);
 
