@@ -151,6 +151,12 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     exportPreview: { backgroundColor: c.bg_elevated, borderRadius: radius.lg, padding: spacing.xl, borderWidth: 1, borderColor: c.glass_border, borderLeftWidth: 3, borderLeftColor: c.accent_gold, paddingLeft: spacing.lg },
     exportPreviewText: { color: c.text_primary, fontSize: fontSizes.sm, lineHeight: 22, maxHeight: 120 },
     templatePreview: { borderRadius: radius.xl, padding: spacing.xl, minHeight: 260, justifyContent: 'space-between' as const, overflow: 'hidden' as const },
+    fullExportLayer: { position: 'absolute' as const, left: -10000, top: 0, width: 1080, opacity: 0 },
+    fullTemplatePreview: { width: 1080, minHeight: 1350, borderRadius: 48, padding: 96, justifyContent: 'space-between' as const, overflow: 'hidden' as const },
+    fullTemplateBadge: { alignSelf: 'flex-start' as const, borderRadius: radius.full, paddingHorizontal: 36, paddingVertical: 18 },
+    fullTemplateBadgeText: { fontSize: 28, fontWeight: '700' as const, letterSpacing: 2, textTransform: 'uppercase' as const },
+    fullTemplateBody: { lineHeight: 72, fontWeight: '600' as const, marginVertical: 72 },
+    fullTemplateFooter: { fontSize: 28, fontWeight: '600' as const, letterSpacing: 2.4, textTransform: 'uppercase' as const },
     templateGlyph: { position: 'absolute' as const },
     templateBadge: { alignSelf: 'flex-start' as const, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
     templateBadgeText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
@@ -204,6 +210,7 @@ export default function CreateModeScreen() {
   const resultAnim = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
   const exportShotRef = useRef<ViewShot | null>(null);
+  const fullExportShotRef = useRef<ViewShot | null>(null);
   const selectedTool = tool || 'love-letter';
   const availableTemplates = useMemo(() => getTemplatesForTool(selectedTool), [selectedTool]);
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) ?? defaultTemplate;
@@ -312,10 +319,11 @@ export default function CreateModeScreen() {
   }, [handleCopy]);
 
   const captureTemplateImage = useCallback(async () => {
-    if (!exportShotRef.current) {
-      throw new Error('Export preview is not ready.');
+    const targetRef = fullExportShotRef.current ?? exportShotRef.current;
+    if (!targetRef) {
+      throw new Error('Export card is not ready.');
     }
-    return await captureRef(exportShotRef.current, {
+    return await captureRef(targetRef, {
       format: 'png',
       quality: 1,
       result: 'tmpfile',
@@ -351,13 +359,18 @@ export default function CreateModeScreen() {
         return;
       }
 
-      const permission = await MediaLibrary.requestPermissionsAsync();
+      const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
       if (!permission.granted) {
         toast.warning('Photo permission is needed to save the image.');
         return;
       }
 
-      await MediaLibrary.saveToLibraryAsync(uri);
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      try {
+        await MediaLibrary.createAlbumAsync('Love Test AI', asset, false);
+      } catch {
+        await MediaLibrary.saveToLibraryAsync(uri);
+      }
       toast.success('Image saved to your gallery.');
       setShowExportSheet(false);
     } catch (error) {
@@ -446,6 +459,51 @@ export default function CreateModeScreen() {
         <TouchableOpacity style={styles.exportOverlay} activeOpacity={1} onPress={() => setShowExportSheet(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={styles.exportSheet}>
+              <View pointerEvents="none" style={styles.fullExportLayer}>
+                <ViewShot ref={fullExportShotRef} options={{ format: 'png', quality: 1 }}>
+                  <LinearGradient colors={selectedTemplate.background as any} style={styles.fullTemplatePreview} collapsable={false}>
+                    {selectedTemplate.glyphs.map((glyph, index) => (
+                      <View
+                        key={`full-${glyph.symbol}-${index}`}
+                        style={[
+                          styles.templateGlyph,
+                          {
+                            left: glyph.x,
+                            top: glyph.y,
+                            opacity: glyph.opacity,
+                            transform: [{ rotate: `${glyph.rotate}deg` }],
+                          },
+                        ]}
+                      >
+                        {React.createElement(GLYPH_ICONS[glyph.symbol] ?? Shell, {
+                          size: glyph.size * 3.6,
+                          color: selectedTemplate.accent,
+                          strokeWidth: 1.4,
+                        })}
+                      </View>
+                    ))}
+                    <View style={[styles.fullTemplateBadge, { backgroundColor: selectedTemplate.badge }]}>
+                      <Text style={[styles.fullTemplateBadgeText, { color: selectedTemplate.accent }]}>{meta.title}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.fullTemplateBody,
+                        {
+                          color: selectedTemplate.text,
+                          fontFamily: selectedFontFamily,
+                          fontSize: 48 * selectedSizeScale,
+                          lineHeight: 72 * selectedSizeScale,
+                        },
+                      ]}
+                    >
+                      {result}
+                    </Text>
+                    <Text style={[styles.fullTemplateFooter, { color: selectedTemplate.muted }]}>
+                      {toName ? `For ${toName} - ` : ''}Love Test AI
+                    </Text>
+                  </LinearGradient>
+                </ViewShot>
+              </View>
               <View style={styles.exportHandle} />
               <View style={styles.exportHeader}>
                 <Text style={styles.exportTitle}>Export Your Creation</Text>

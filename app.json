@@ -31,7 +31,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-media-library",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Love Test AI to save your exported creation cards to your photo library.",
+          "savePhotosPermission": "Allow Love Test AI to save your exported creation cards to your photo library."
+        }
+      ],
       "expo-web-browser",
       "expo-sqlite"
     ],
