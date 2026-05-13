@@ -22,6 +22,7 @@ import {
   removeJournalEntry,
   removePrompt,
 } from '@/services/db';
+import { useFeedbackStore } from '@/store/feedbackStore';
 
 interface AppState {
   isLoading: boolean;
@@ -109,6 +110,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveCreation: (c) => {
     set((s) => ({ savedCreations: [c, ...s.savedCreations] }));
     void insertCreation(c);
+    void useFeedbackStore.getState().recordUse(`creation:${c.type}`);
   },
 
   deleteCreation: (id) => {
@@ -130,11 +132,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     void insertJournalEntry(e);
     void persistStreak(newStreak);
+    void useFeedbackStore.getState().recordUse('journal');
   },
 
   savePrompt: (p) => {
     set((s) => ({ savedPrompts: [p, ...s.savedPrompts] }));
     void insertPrompt(p);
+    void useFeedbackStore.getState().recordUse('prompt');
   },
 
   deleteSavedPrompt: (id) => {
@@ -151,6 +155,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = get().completedTests + 1;
     set({ completedTests: next });
     void persistCompletedTests(next);
+    void useFeedbackStore.getState().recordUse('test');
   },
 
   resetApp: () => {

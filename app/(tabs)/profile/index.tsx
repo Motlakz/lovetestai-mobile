@@ -32,7 +32,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { useAuthStore } from '@/store/authStore';
 import { useAuthGate } from '@/components/auth/AuthGateModal';
-import FeedbackModal from '@/components/ui/FeedbackModal';
+import { useFeedbackStore } from '@/store/feedbackStore';
 import { buildViralCreationShareText } from '@/services/creationTemplates';
 
 const STATUSES = ['Single', 'In a Relationship', "It's Complicated", 'Prefer not to say'];
@@ -76,11 +76,13 @@ function createStyles(c: ThemeColors) {
     emptyText: { fontSize: fontSizes.base, color: c.text_muted, fontStyle: 'italic' as const },
     creationCard: { padding: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md, marginBottom: spacing.sm },
     creationCardSelected: { borderColor: c.accent_rose, backgroundColor: `${c.accent_rose}12` },
-    creationLeft: { alignItems: 'center' as const, gap: spacing.xs },
-    creationType: { fontSize: fontSizes.xs, color: c.text_muted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-    creationCenter: { flex: 1 },
-    creationPreview: { fontSize: fontSizes.sm, color: c.text_secondary },
-    creationDate: { fontSize: fontSizes.xs, color: c.text_muted, marginTop: spacing.xs },
+    creationLeft: { width: 40, height: 40, borderRadius: 20, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: `${c.accent_violet}18`, borderWidth: 1, borderColor: `${c.accent_violet}33` },
+    creationCenter: { flex: 1, minWidth: 0 },
+    creationMetaRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, marginBottom: 4 },
+    creationType: { flexShrink: 1, fontSize: fontSizes.xs, color: c.accent_rose, textTransform: 'uppercase' as const, letterSpacing: 0.5, fontWeight: '700' as const },
+    creationDate: { fontSize: fontSizes.xs, color: c.text_muted },
+    creationPreview: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 19 },
+    creationMenuBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center' as const, justifyContent: 'center' as const },
     divider: { marginVertical: spacing.lg },
     themeSectionTitle: { fontSize: fontSizes.sm, color: c.text_muted, fontWeight: '600' as const, letterSpacing: 1.2, textTransform: 'uppercase' as const, marginBottom: spacing.md, marginTop: spacing.sm },
     settingsRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: c.glass_border },
@@ -181,13 +183,13 @@ export default function ProfileScreen() {
   const account = useAuthStore((s) => s.account);
   const signOutAccount = useAuthStore((s) => s.signOut);
   const { openSignIn } = useAuthGate();
+  const openManualFeedback = useFeedbackStore((state) => state.openManual);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editStatus, setEditStatus] = useState(profile.relationshipStatus);
   const [editDob, setEditDob] = useState(profile.dateOfBirth);
   const [showAllCreations, setShowAllCreations] = useState(false);
-  const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [themeSheetVisible, setThemeSheetVisible] = useState(false);
   const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
 
@@ -376,8 +378,8 @@ export default function ProfileScreen() {
 
   const handleRateApp = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFeedbackVisible(true);
-  }, []);
+    openManualFeedback('profile');
+  }, [openManualFeedback]);
 
   const handlePrivacyPolicy = useCallback(() => {
     Linking.openURL('https://lovetestai.com/privacy').catch(() => {
@@ -533,17 +535,20 @@ export default function ProfileScreen() {
                       size={18}
                       color={selectedCreationIds.includes(creation.id) ? colors.accent_rose : colors.accent_violet}
                     />
-                    <Text style={styles.creationType}>{creation.type}</Text>
                   </View>
                   <View style={styles.creationCenter}>
-                    <Text style={styles.creationPreview} numberOfLines={1}>{creation.content}</Text>
-                    <Text style={styles.creationDate}>
-                      {new Date(creation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {creation.toName ? ` · For ${creation.toName}` : ''}
-                    </Text>
+                    <View style={styles.creationMetaRow}>
+                      <Text style={styles.creationType} numberOfLines={1}>{creation.type}</Text>
+                      <Text style={styles.creationDate} numberOfLines={1}>
+                        {new Date(creation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {creation.toName ? ` - For ${creation.toName}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.creationPreview} numberOfLines={2}>{creation.content}</Text>
                   </View>
                   <TouchableOpacity
                     disabled={selectionActive}
+                    style={styles.creationMenuBtn}
                     onPress={() => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       alert({
@@ -653,8 +658,6 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      <FeedbackModal visible={feedbackVisible} onClose={() => setFeedbackVisible(false)} />
 
       <Modal visible={themeSheetVisible} transparent animationType="slide" onRequestClose={() => setThemeSheetVisible(false)}>
         <TouchableOpacity

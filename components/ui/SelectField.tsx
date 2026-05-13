@@ -13,11 +13,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { radius, fontSizes, spacing } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
 
+type SelectOption = string | { label: string; value: string };
+
 interface SelectFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: SelectOption[];
   placeholder?: string;
 }
 
@@ -26,10 +28,14 @@ export default function SelectField({
   value,
   onChange,
   options,
-  placeholder = 'Select…',
+  placeholder = 'Select...',
 }: SelectFieldProps) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
+  const normalizedOptions = options.map((option) =>
+    typeof option === 'string' ? { label: option, value: option } : option
+  );
+  const selectedOption = normalizedOptions.find((option) => option.value === value);
 
   return (
     <View style={styles.container}>
@@ -46,7 +52,7 @@ export default function SelectField({
         activeOpacity={0.8}
       >
         <Text style={[styles.triggerText, { color: value ? colors.text_primary : colors.text_muted }]}>
-          {value || placeholder}
+          {selectedOption?.label || value || placeholder}
         </Text>
         <Ionicons
           name={open ? 'chevron-up' : 'chevron-down'}
@@ -81,18 +87,18 @@ export default function SelectField({
               {label}
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-              {options.map((opt) => {
-                const isSelected = opt === value;
+              {normalizedOptions.map((opt) => {
+                const isSelected = opt.value === value;
                 return (
                   <TouchableOpacity
-                    key={opt}
+                    key={opt.value}
                     style={[
                       styles.option,
                       isSelected && { backgroundColor: 'rgba(255,61,127,0.10)' },
                     ]}
                     onPress={() => {
                       void Haptics.selectionAsync();
-                      onChange(opt);
+                      onChange(opt.value);
                       setOpen(false);
                     }}
                     activeOpacity={0.7}
@@ -103,7 +109,7 @@ export default function SelectField({
                         { color: isSelected ? colors.accent_rose : colors.text_primary },
                       ]}
                     >
-                      {opt}
+                      {opt.label}
                     </Text>
                     {isSelected && (
                       <Ionicons name="checkmark" size={16} color={colors.accent_rose} />

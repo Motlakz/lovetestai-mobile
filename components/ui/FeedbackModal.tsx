@@ -17,10 +17,14 @@ import GlassCard from './GlassCard';
 import GradientButton from './GradientButton';
 import GhostButton from './GhostButton';
 import { useToast } from './Toast';
+import { submitInternalFeedback } from '@/services/feedback';
+import { useAuthStore } from '@/store/authStore';
 
 interface FeedbackModalProps {
   visible: boolean;
   onClose: () => void;
+  source?: string;
+  onSubmitted?: (rating: number) => Promise<void> | void;
 }
 
 const RATING_CONFIG: { value: number; icon: string; label: string; color: string }[] = [
@@ -31,12 +35,14 @@ const RATING_CONFIG: { value: number; icon: string; label: string; color: string
   { value: 5, icon: 'heart-outline', label: 'Excellent', color: '#FF3D7F' },
 ];
 
-export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
+export default function FeedbackModal({ visible, onClose, source = 'app', onSubmitted }: FeedbackModalProps) {
   const { colors } = useTheme();
   const toast = useToast();
+  const account = useAuthStore((state) => state.account);
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const scaleAnims = useRef(RATING_CONFIG.map(() => new Animated.Value(1))).current;
   const selectedScaleAnim = useRef(new Animated.Value(0)).current;
@@ -48,6 +54,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
       setRating(0);
       setComment('');
       setSubmitted(false);
+      setIsSubmitting(false);
       fadeAnim.setValue(0);
       successAnim.setValue(0);
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
@@ -69,19 +76,35 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
     Animated.spring(selectedScaleAnim, { toValue: 1, useNativeDriver: true, damping: 8 }).start();
   }, [scaleAnims, selectedScaleAnim]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (rating === 0) {
       toast.warning('Please select a rating before submitting.');
       return;
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSubmitted(true);
-    Animated.spring(successAnim, { toValue: 1, useNativeDriver: true, damping: 8 }).start();
+    setIsSubmitting(true);
+    try {
+      await submitInternalFeedback({
+        source,
+        starRating: rating,
+        comments: comment,
+        accountId: account?.accountId,
+        email: account?.email,
+      });
+      await onSubmitted?.(rating);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSubmitted(true);
+      Animated.spring(successAnim, { toValue: 1, useNativeDriver: true, damping: 8 }).start();
 
-    setTimeout(() => {
-      onClose();
-    }, 2000);
-  }, [rating, onClose, successAnim, toast]);
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (error) {
+      console.log('Feedback submit failed:', error);
+      toast.error('Could not submit feedback right now. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [account?.accountId, account?.email, comment, onClose, onSubmitted, rating, source, successAnim, toast]);
 
   const selectedConfig = rating > 0 ? RATING_CONFIG[rating - 1] : null;
   const successScale = successAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
@@ -136,7 +159,7 @@ export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) 
                 <Text style={[styles.charCount, { color: colors.text_muted }]}>{comment.length}/500</Text>
               )}
 
-              <GradientButton label="Submit Feedback" onPress={handleSubmit} disabled={rating === 0} />
+              <GradientButton label={isSubmitting ? 'Submitting...' : 'Submit Feedback'} onPress={handleSubmit} disabled={rating === 0 || isSubmitting} />
               <GhostButton label="Maybe Later" onPress={onClose} style={styles.skipBtn} />
             </GlassCard>
           ) : (

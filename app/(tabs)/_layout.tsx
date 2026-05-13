@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import { fontSizes } from '@/constants/theme';
 import DrawerMenu from '@/components/ui/DrawerMenu';
-import FeedbackModal from '@/components/ui/FeedbackModal';
+import { useFeedbackStore } from '@/store/feedbackStore';
 
 interface TabIconProps {
   name: string;
@@ -34,12 +34,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const openManualFeedback = useFeedbackStore((state) => state.openManual);
 
   const openDrawer = useCallback(() => setDrawerVisible(true), []);
   const closeDrawer = useCallback(() => setDrawerVisible(false), []);
-  const openFeedback = useCallback(() => setFeedbackVisible(true), []);
-  const closeFeedback = useCallback(() => setFeedbackVisible(false), []);
+  const openFeedback = useCallback(() => openManualFeedback('drawer'), [openManualFeedback]);
 
   const bottomSafe = useMemo(() => {
     if (insets.bottom > 0) return insets.bottom;
@@ -142,7 +141,6 @@ export default function TabLayout() {
       </Tabs>
 
       <DrawerMenu visible={drawerVisible} onClose={closeDrawer} onOpenFeedback={openFeedback} />
-      <FeedbackModal visible={feedbackVisible} onClose={closeFeedback} />
     </View>
   );
 }

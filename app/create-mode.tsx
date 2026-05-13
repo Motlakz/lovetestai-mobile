@@ -45,12 +45,14 @@ import GhostButton from '@/components/ui/GhostButton';
 import GoldDivider from '@/components/ui/GoldDivider';
 import SectionTitle from '@/components/ui/SectionTitle';
 import InputField from '@/components/ui/InputField';
+import SelectField from '@/components/ui/SelectField';
 import LoadingPulse from '@/components/ui/LoadingPulse';
 import HeartParticles from '@/components/ui/HeartParticles';
 import { useApp } from '@/context/AppContext';
 import { generateContent } from '@/services/aiService';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
+import { useFeedbackStore } from '@/store/feedbackStore';
 import {
   buildViralCreationShareText,
   getDefaultTemplateForTool,
@@ -115,6 +117,11 @@ function formatChoiceLabel(value: string): string {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const VIBE_OPTIONS = VIBES.map((value) => ({ value, label: formatChoiceLabel(value) }));
+const OCCASION_OPTIONS = OCCASIONS.map((value) => ({ value, label: formatChoiceLabel(value) }));
+const LENGTH_OPTIONS = LENGTHS.map((value) => ({ value, label: value }));
+const POEM_STYLE_OPTIONS = POEM_STYLES.map((value) => ({ value, label: value }));
+
 function createStyles(c: ThemeColors, _s: ThemeShadows) {
   return StyleSheet.create({
     flex: { flex: 1 },
@@ -126,12 +133,6 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     topBarSub: { fontSize: fontSizes.xs, color: c.text_muted },
     scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
     formPanel: { padding: spacing.xl, marginBottom: spacing.lg },
-    fieldLabel: { color: c.text_secondary, fontSize: fontSizes.sm, fontWeight: '500' as const, marginBottom: spacing.sm, marginTop: spacing.sm },
-    pillRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, marginBottom: spacing.md },
-    pill: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.glass_fill },
-    pillSelected: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.12)' },
-    pillText: { color: c.text_secondary, fontSize: fontSizes.sm },
-    pillTextSelected: { color: c.text_primary, fontWeight: '500' as const },
     generateBtn: { marginBottom: spacing.sm },
     disclaimer: { color: c.text_muted, fontSize: fontSizes.xs, textAlign: 'center' as const, marginBottom: spacing.xl },
     resultContainer: { marginTop: spacing.md },
@@ -140,9 +141,12 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     resultActions: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, justifyContent: 'center' as const },
     bottomSpacer: { height: 40 },
     exportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' as const },
-    exportSheet: { backgroundColor: c.bg_surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: c.glass_border, borderBottomWidth: 0 },
+    exportSheet: { backgroundColor: c.bg_surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: c.glass_border, borderBottomWidth: 0, height: '100%' as const },
     exportHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.glass_border, alignSelf: 'center' as const, marginTop: spacing.md },
-    exportContent: { paddingTop: spacing.lg, paddingHorizontal: spacing.xl, gap: spacing.md },
+    exportHeader: { paddingTop: spacing.lg, paddingHorizontal: spacing.xl, paddingBottom: spacing.md, gap: spacing.md },
+    exportScroll: { flex: 1 },
+    exportScrollContent: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md },
+    exportFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: c.glass_border, backgroundColor: c.bg_surface },
     exportTitle: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '600' as const, textAlign: 'center' as const },
     exportPreview: { backgroundColor: c.bg_elevated, borderRadius: radius.lg, padding: spacing.xl, borderWidth: 1, borderColor: c.glass_border, borderLeftWidth: 3, borderLeftColor: c.accent_gold, paddingLeft: spacing.lg },
     exportPreviewText: { color: c.text_primary, fontSize: fontSizes.sm, lineHeight: 22, maxHeight: 120 },
@@ -174,6 +178,7 @@ export default function CreateModeScreen() {
   const { saveCreation, profile } = useApp();
   const toast = useToast();
   const { alert } = useAppAlert();
+  const recordFeedbackUse = useFeedbackStore((state) => state.recordUse);
 
   const meta = TOOL_META[tool || 'love-letter'] || TOOL_META['love-letter'];
 
@@ -218,6 +223,7 @@ export default function CreateModeScreen() {
       );
       setResult(content);
       setShowResult(true);
+      void recordFeedbackUse(`generator:${selectedTool}`);
       Animated.spring(resultAnim, { toValue: 1, useNativeDriver: true, damping: 15 }).start();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 300);
@@ -227,7 +233,7 @@ export default function CreateModeScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast]);
+  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast, recordFeedbackUse]);
 
   const handleCopy = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -360,37 +366,23 @@ export default function CreateModeScreen() {
     }
   }, [captureTemplateImage, toast]);
 
-  const renderPillSelector = (options: string[], selected: string, onSelect: (v: string) => void, formatter = (v: string) => v) => (
-    <View style={styles.pillRow}>
-      {options.map((opt) => (
-        <TouchableOpacity key={opt} onPress={() => { onSelect(opt); void Haptics.selectionAsync(); }} style={[styles.pill, selected === opt && styles.pillSelected]}>
-          <Text style={[styles.pillText, selected === opt && styles.pillTextSelected]}>{formatter(opt)}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
   const renderToolFields = () => {
     switch (selectedTool) {
       case 'love-letter':
         return (<>
           <InputField label="What makes them special?" value={detail} onChangeText={setDetail} placeholder="Their laugh, kindness, the way they..." multiline />
-          <Text style={styles.fieldLabel}>Occasion</Text>
-          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
+          <SelectField label="Occasion" value={occasion} onChange={setOccasion} options={OCCASION_OPTIONS} placeholder="Choose an occasion" />
         </>);
       case 'love-poem':
         return (<>
           <InputField label="A feeling or memory to capture" value={memory} onChangeText={setMemory} placeholder="The first time we danced..." multiline />
-          <Text style={styles.fieldLabel}>Occasion</Text>
-          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
-          <Text style={styles.fieldLabel}>Style</Text>
-          {renderPillSelector(POEM_STYLES, poemStyle, setPoemStyle)}
+          <SelectField label="Occasion" value={occasion} onChange={setOccasion} options={OCCASION_OPTIONS} placeholder="Choose an occasion" />
+          <SelectField label="Style" value={poemStyle} onChange={setPoemStyle} options={POEM_STYLE_OPTIONS} placeholder="Choose a poem style" />
         </>);
       case 'love-note':
         return (<>
           <InputField label="One thing you want to say" value={message} onChangeText={setMessage} placeholder="I'm grateful for..." />
-          <Text style={styles.fieldLabel}>Occasion</Text>
-          {renderPillSelector(OCCASIONS, occasion, setOccasion, formatChoiceLabel)}
+          <SelectField label="Occasion" value={occasion} onChange={setOccasion} options={OCCASION_OPTIONS} placeholder="Choose an occasion" />
         </>);
       case 'love-quote':
         return <InputField label="Describe your love in one word" value={word} onChangeText={setWord} placeholder="Infinite, tender, electric..." />;
@@ -420,15 +412,9 @@ export default function CreateModeScreen() {
                 <InputField label="For" value={toName} onChangeText={setToName} placeholder="Their first name" />
                 <InputField label="From" value={fromName} onChangeText={setFromName} placeholder="Your name" />
               </>
-              <>
-                <Text style={styles.fieldLabel}>Vibe</Text>
-                {renderPillSelector(VIBES, tone, setTone, formatChoiceLabel)}
-              </>
+              <SelectField label="Vibe" value={tone} onChange={setTone} options={VIBE_OPTIONS} placeholder="Choose a vibe" />
               {(selectedTool === 'love-letter' || selectedTool === 'love-poem') && (
-                <>
-                  <Text style={styles.fieldLabel}>Length</Text>
-                  {renderPillSelector(LENGTHS, length, setLength)}
-                </>
+                <SelectField label="Length" value={length} onChange={setLength} options={LENGTH_OPTIONS} placeholder="Choose a length" />
               )}
               {renderToolFields()}
             </GlassCard>
@@ -461,7 +447,7 @@ export default function CreateModeScreen() {
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={styles.exportSheet}>
               <View style={styles.exportHandle} />
-              <View style={[styles.exportContent, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+              <View style={styles.exportHeader}>
                 <Text style={styles.exportTitle}>Export Your Creation</Text>
                 <ViewShot ref={exportShotRef} options={{ format: 'png', quality: 1 }}>
                   <LinearGradient colors={selectedTemplate.background as any} style={styles.templatePreview} collapsable={false}>
@@ -507,6 +493,13 @@ export default function CreateModeScreen() {
                     </Text>
                   </LinearGradient>
                 </ViewShot>
+              </View>
+              <ScrollView
+                style={styles.exportScroll}
+                contentContainerStyle={styles.exportScrollContent}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
                 <View style={styles.templateRow}>
                   {availableTemplates.slice(0, 4).map((template) => (
                     <TouchableOpacity
@@ -609,6 +602,8 @@ export default function CreateModeScreen() {
                   <Text style={styles.exportOptionLabel}>Copy Text</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
                 </TouchableOpacity>
+              </ScrollView>
+              <View style={[styles.exportFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
                 <GhostButton label="Close" onPress={() => setShowExportSheet(false)} style={styles.exportCloseBtn} />
               </View>
             </View>

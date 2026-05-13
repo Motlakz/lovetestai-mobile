@@ -26,6 +26,7 @@ import AnimatedSplash from "@/components/ui/AnimatedSplash";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AppAlertProvider } from "@/components/ui/AppAlertModal";
 import { AuthGateProvider } from "@/components/auth/AuthGateModal";
+import FeedbackProvider from "@/components/ui/FeedbackProvider";
 import { useAuthStore } from "@/store/authStore";
 import { usePartnerStore } from "@/store/partnerStore";
 
@@ -114,7 +115,9 @@ export default function RootLayout() {
             <AppAlertProvider>
               <ToastProvider>
                 <AuthGateProvider>
-                  <RootLayoutNav />
+                  <FeedbackProvider>
+                    <RootLayoutNav />
+                  </FeedbackProvider>
                 </AuthGateProvider>
               </ToastProvider>
             </AppAlertProvider>

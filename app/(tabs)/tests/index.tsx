@@ -97,11 +97,6 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     calcSub: { fontSize: fontSizes.sm, color: c.text_secondary, marginBottom: spacing.xl },
     calcLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const, marginBottom: spacing.sm, marginTop: spacing.md },
     calcInput: { backgroundColor: c.bg_elevated, borderWidth: 1, borderColor: c.glass_border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, color: c.text_primary, fontSize: fontSizes.base },
-    signGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, marginBottom: spacing.md },
-    signChip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.bg_elevated },
-    signChipSelected: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.12)' },
-    signChipText: { fontSize: fontSizes.xs, color: c.text_secondary },
-    signChipTextSelected: { color: c.text_primary, fontWeight: '600' as const },
     calcResultCard: { padding: spacing.xl, marginBottom: spacing.xl },
     calcScoreRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: spacing.md, marginBottom: spacing.lg },
     calcScoreNum: { fontSize: fontSizes['3xl'], color: c.text_gold, fontWeight: '700' as const },
@@ -350,13 +345,6 @@ export default function TestsScreen() {
     }
   }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests]);
 
-  const toggleInterest = useCallback((interest: string) => {
-    void Haptics.selectionAsync();
-    setSoulmateInterests(prev =>
-      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
-    );
-  }, []);
-
   // ── Quiz screen ──────────────────────────────────────────────────────────────
   if (screenState === 'quiz') {
     const question = LOVE_LANGUAGE_QUESTIONS[currentQuestion];
@@ -576,16 +564,13 @@ export default function TestsScreen() {
               <DatePickerField label="Your Birthday" value={calcInput2} onChange={setCalcInput2} />
               <SelectField label="Your Zodiac Sign" value={calcInput3} onChange={setCalcInput3} options={ZODIAC_SIGNS} placeholder="Choose your sign" />
               <SelectField label="Your Love Language" value={calcInput4} onChange={setCalcInput4} options={LOVE_LANGUAGES} placeholder="Select your love language" />
-              <Text style={styles.calcLabel}>Your interests (pick any)</Text>
-              <View style={styles.signGrid}>
-                {INTEREST_OPTIONS.map(interest => (
-                  <TouchableOpacity key={interest} onPress={() => toggleInterest(interest)}>
-                    <View style={[styles.signChip, soulmateInterests.includes(interest) && styles.signChipSelected]}>
-                      <Text style={[styles.signChipText, soulmateInterests.includes(interest) && styles.signChipTextSelected]}>{interest}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <SelectField
+                label="Your Main Interest"
+                value={soulmateInterests[0] ?? ''}
+                onChange={(value) => setSoulmateInterests([value])}
+                options={INTEREST_OPTIONS}
+                placeholder="Choose an interest"
+              />
             </>)}
 
             <GradientButton
