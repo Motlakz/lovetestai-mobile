@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemeColors, ThemeShadows, fontSizes, spacing, radius } from '@/constants/theme';
 import ScreenBackground from '@/components/ui/ScreenBackground';
@@ -29,6 +30,9 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { ALL_TESTS, LOVE_LANGUAGE_QUESTIONS, LOVE_LANGUAGE_RESULTS, ATTACHMENT_STYLES, LL_TO_ATTACHMENT, LOVE_QUIZ_QUESTIONS, LQ_ANSWER_CHOICES, CalculatorTest, LLResult, AttachmentStyle, LQQuestion } from '@/mocks/tests';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/ui/Toast';
+import { useAuthStore } from '@/store/authStore';
+import { usePartnerStore } from '@/store/partnerStore';
+import { sharePartnerItem } from '@/services/partnerExchange';
 import {
   calculateZodiacCompatibility,
   calculateBirthdateCompatibility,
@@ -54,7 +58,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     header: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
     headerSub: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const, marginTop: spacing.xs },
-    listContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    listContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     featuredCard: { padding: spacing.xl, marginBottom: spacing.lg, minHeight: 130, justifyContent: 'center' as const, gap: spacing.sm },
     featuredTitle: { fontSize: fontSizes.xl, color: c.text_primary, fontWeight: '700' as const },
     featuredDetail: { fontSize: fontSizes.sm, color: c.text_secondary },
@@ -73,7 +77,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     backBtn: { padding: spacing.xs },
     quizProgress: { fontSize: fontSizes.xs, color: c.text_muted, letterSpacing: 1.5, textTransform: 'uppercase' as const },
     progressContainer: { paddingHorizontal: spacing.xl, marginBottom: spacing.xl },
-    quizContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    quizContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     questionText: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '600' as const, textAlign: 'center' as const, marginBottom: spacing['2xl'], lineHeight: 38 },
     answersContainer: { gap: spacing.md, marginBottom: spacing.xl },
     answerCard: { padding: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },
@@ -81,7 +85,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     answerText: { color: c.text_secondary, fontSize: fontSizes.base, flex: 1, marginRight: spacing.sm },
     answerTextSelected: { color: c.text_primary, fontWeight: '500' as const },
     nextBtn: { alignSelf: 'center' as const },
-    resultContent: { paddingHorizontal: spacing.xl, paddingTop: spacing['2xl'], paddingBottom: spacing['3xl'], alignItems: 'center' as const },
+    resultContent: { paddingHorizontal: spacing.xl, paddingTop: spacing['2xl'], paddingBottom: spacing.md, alignItems: 'center' as const },
     resultIconContainer: { marginBottom: spacing.xl },
     resultIconGradient: { width: 100, height: 100, borderRadius: 50, alignItems: 'center' as const, justifyContent: 'center' as const },
     resultTitle: { fontSize: fontSizes['3xl'], color: c.text_primary, fontWeight: '700' as const, textAlign: 'center' as const, letterSpacing: -0.5, marginBottom: spacing.sm },
@@ -92,7 +96,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     reportPreview: { color: c.text_secondary, fontSize: fontSizes.base, lineHeight: 24, padding: spacing.xl },
     resultActions: { gap: spacing.md, alignItems: 'center' as const, width: '100%' },
     bottomSpacer: { height: 40 },
-    calcContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    calcContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     calcTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, marginBottom: spacing.xs },
     calcSub: { fontSize: fontSizes.sm, color: c.text_secondary, marginBottom: spacing.xl },
     calcLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const, marginBottom: spacing.sm, marginTop: spacing.md },
@@ -114,10 +118,13 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
 
 export default function TestsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
-  const { incrementTests } = useApp();
+  const { incrementTests, profile, saveCreation } = useApp();
   const toast = useToast();
+  const account = useAuthStore((s) => s.account);
+  const partnerLink = usePartnerStore((s) => s.link);
   const [screenState, setScreenState] = useState<ScreenState>('list');
 
   // Love language quiz state
@@ -286,6 +293,66 @@ export default function TestsScreen() {
     setCalcResult(null);
   }, []);
 
+  const sendToPartner = useCallback(async (params: { title: string; body: string; score?: number | null }) => {
+    if (!account) {
+      toast.warning('Sign-in not ready yet.');
+      return;
+    }
+    if (!partnerLink?.pairId) {
+      toast.info('Pair with someone first to share inside Love Test AI.');
+      router.push('/(tabs)/partner' as any);
+      return;
+    }
+    if (!partnerLink.pairId.includes(account.accountId)) {
+      toast.error('Pair belongs to a previous identity. Reconnect first.');
+      return;
+    }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await sharePartnerItem({
+        pairId: partnerLink.pairId,
+        kind: 'test-result',
+        title: params.title,
+        body: params.body,
+        score: params.score ?? null,
+        account,
+        senderName: profile.name?.trim() || account.displayName || account.email || null,
+      });
+      toast.success('Sent to your partner.');
+    } catch (e) {
+      console.log('partner share failed:', e);
+      toast.error('Could not send to partner.');
+    }
+  }, [account, partnerLink, profile.name, router, toast]);
+
+  const handleSaveLLResult = useCallback(() => {
+    if (!llResult) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const content = `Primary Love Language: ${llResult.label}\n\n${llResult.summary}\n\n${llResult.fullReport}${attachmentResult ? `\n\nAttachment Style: ${attachmentResult.label}\n${attachmentResult.summary}` : ''}`;
+    saveCreation({
+      id: Date.now().toString(),
+      type: 'Love Language Result',
+      content,
+      toName: profile.name || '',
+      createdAt: new Date().toISOString(),
+    });
+    toast.success('Saved to your profile.');
+  }, [llResult, attachmentResult, profile.name, saveCreation, toast]);
+
+  const handleSaveCalcResult = useCallback(() => {
+    if (!calcResult || !activeCalcTest) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const scoreLine = calcResult.score !== undefined ? `Score: ${calcResult.score}%\n\n` : '';
+    saveCreation({
+      id: Date.now().toString(),
+      type: activeCalcTest.title,
+      content: `${scoreLine}${calcResult.text}`,
+      toName: profile.name || '',
+      createdAt: new Date().toISOString(),
+    });
+    toast.success('Saved to your profile.');
+  }, [calcResult, activeCalcTest, profile.name, saveCreation, toast]);
+
   const handleShareLLResult = useCallback(async () => {
     if (!llResult) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -427,6 +494,14 @@ export default function TestsScreen() {
             </View>
             <View style={styles.resultActions}>
               <GradientButton label="Share My Result" onPress={handleShareLLResult} />
+              <GhostButton label="Save to Profile" onPress={handleSaveLLResult} />
+              <GhostButton
+                label="Send to Partner"
+                onPress={() => sendToPartner({
+                  title: `Love Language: ${llResult.label}`,
+                  body: `${llResult.summary}\n\n${llResult.fullReport}`,
+                })}
+              />
               <GhostButton label="Try Another Test" onPress={handleBack} />
             </View>
           </ScrollView>
@@ -613,6 +688,15 @@ export default function TestsScreen() {
               <Text style={styles.calcResultText}>{calcResult.text}</Text>
             </GlassCard>
             <View style={styles.calcResultActions}>
+              <GhostButton label="Save to Profile" onPress={handleSaveCalcResult} />
+              <GhostButton
+                label="Send to Partner"
+                onPress={() => sendToPartner({
+                  title: activeCalcTest.title,
+                  body: calcResult.text,
+                  score: calcResult.score ?? null,
+                })}
+              />
               <GhostButton label="Try Another" onPress={() => setScreenState('list')} />
             </View>
           </ScrollView>

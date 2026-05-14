@@ -41,6 +41,7 @@ interface AppState {
   deleteCreation: (id: string) => void;
   deleteCreations: (ids: string[]) => void;
   saveJournalEntry: (e: JournalEntry) => void;
+  updateJournalEntry: (id: string, patch: Partial<Pick<JournalEntry, 'entry'>>) => void;
   savePrompt: (p: SavedPrompt) => void;
   deleteSavedPrompt: (id: string) => void;
   deleteJournalEntry: (id: string) => void;
@@ -133,6 +134,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     void insertJournalEntry(e);
     void persistStreak(newStreak);
     void useFeedbackStore.getState().recordUse('journal');
+  },
+
+  updateJournalEntry: (id, patch) => {
+    const current = get().journalEntries.find((j) => j.id === id);
+    if (!current) return;
+    const updated = { ...current, ...patch };
+    set((s) => ({
+      journalEntries: s.journalEntries.map((j) => (j.id === id ? updated : j)),
+    }));
+    void insertJournalEntry(updated);
   },
 
   savePrompt: (p) => {

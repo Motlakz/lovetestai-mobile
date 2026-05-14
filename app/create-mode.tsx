@@ -53,6 +53,9 @@ import { generateContent } from '@/services/aiService';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { useFeedbackStore } from '@/store/feedbackStore';
+import { useAuthStore } from '@/store/authStore';
+import { usePartnerStore } from '@/store/partnerStore';
+import { sharePartnerItem } from '@/services/partnerExchange';
 import {
   buildViralCreationShareText,
   getDefaultTemplateForTool,
@@ -162,9 +165,26 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     templateBadgeText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
     templateBody: { lineHeight: 30, fontWeight: '600' as const, marginVertical: spacing.xl },
     templateFooter: { fontSize: fontSizes.xs, fontWeight: '600' as const, letterSpacing: 1.2, textTransform: 'uppercase' as const },
-    templateRow: { flexDirection: 'row' as const, gap: spacing.sm },
-    templateChip: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' as const },
-    templateChipText: { fontSize: fontSizes.xs, fontWeight: '600' as const },
+    templateGroup: { marginBottom: spacing.sm },
+    templateGroupLabel: {
+      color: c.text_muted,
+      fontSize: fontSizes.xs,
+      fontWeight: '700' as const,
+      letterSpacing: 1.4,
+      textTransform: 'uppercase' as const,
+      marginBottom: spacing.sm,
+    },
+    templateRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, alignItems: 'center' as const },
+    templateChip: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      minHeight: 36,
+    },
+    templateChipText: { fontSize: fontSizes.sm, fontWeight: '600' as const, lineHeight: 18 },
     exportWatermark: { fontSize: fontSizes.xs, color: c.text_muted, textAlign: 'right' as const, marginTop: spacing.md, fontStyle: 'italic' as const },
     exportOptionRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: c.glass_border },
     exportOptionLabel: { flex: 1, fontSize: fontSizes.base, color: c.text_primary },
@@ -185,6 +205,8 @@ export default function CreateModeScreen() {
   const toast = useToast();
   const { alert } = useAppAlert();
   const recordFeedbackUse = useFeedbackStore((state) => state.recordUse);
+  const account = useAuthStore((s) => s.account);
+  const partnerLink = usePartnerStore((s) => s.link);
 
   const meta = TOOL_META[tool || 'love-letter'] || TOOL_META['love-letter'];
 
@@ -317,6 +339,40 @@ export default function CreateModeScreen() {
     await handleCopy();
     setShowExportSheet(false);
   }, [handleCopy]);
+
+  const handleSendToPartner = useCallback(async () => {
+    if (!result) return;
+    if (!account) {
+      toast.warning('Sign-in not ready yet.');
+      return;
+    }
+    if (!partnerLink?.pairId) {
+      toast.info('Pair with someone first in Partner Mode.');
+      setShowExportSheet(false);
+      router.push('/(tabs)/partner' as any);
+      return;
+    }
+    if (!partnerLink.pairId.includes(account.accountId)) {
+      toast.error('Pair belongs to a previous identity. Reconnect first.');
+      return;
+    }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await sharePartnerItem({
+        pairId: partnerLink.pairId,
+        kind: 'creation',
+        title: toName ? `${meta.title} for ${toName}` : meta.title,
+        body: result,
+        account,
+        senderName: profile.name?.trim() || account.displayName || account.email || null,
+      });
+      toast.success('Sent to your partner.');
+      setShowExportSheet(false);
+    } catch (e) {
+      console.log('partner creation share failed:', e);
+      toast.error('Could not send to partner.');
+    }
+  }, [account, meta.title, partnerLink, profile.name, result, router, toName, toast]);
 
   const captureTemplateImage = useCallback(async () => {
     const targetRef = fullExportShotRef.current ?? exportShotRef.current;
@@ -558,82 +614,91 @@ export default function CreateModeScreen() {
                 showsVerticalScrollIndicator={false}
                 bounces={false}
               >
-                <View style={styles.templateRow}>
-                  {availableTemplates.slice(0, 4).map((template) => (
-                    <TouchableOpacity
-                      key={template.id}
-                      onPress={() => {
-                        setSelectedTemplateId(template.id);
-                        void Haptics.selectionAsync();
-                      }}
-                      activeOpacity={0.85}
-                      style={[
-                        styles.templateChip,
-                        {
-                          borderColor: selectedTemplateId === template.id ? template.accent : colors.glass_border,
-                          backgroundColor: selectedTemplateId === template.id ? `${template.accent}1F` : colors.glass_fill,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.templateChipText, { color: selectedTemplateId === template.id ? template.accent : colors.text_secondary }]}>
-                        {template.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.templateRow}>
-                  {FONT_OPTIONS.map((font) => (
-                    <TouchableOpacity
-                      key={font.family}
-                      onPress={() => {
-                        setSelectedFontFamily(font.family);
-                        void Haptics.selectionAsync();
-                      }}
-                      activeOpacity={0.85}
-                      style={[
-                        styles.templateChip,
-                        {
-                          borderColor: selectedFontFamily === font.family ? selectedTemplate.accent : colors.glass_border,
-                          backgroundColor: selectedFontFamily === font.family ? `${selectedTemplate.accent}1F` : colors.glass_fill,
-                        },
-                      ]}
-                    >
-                      <Text
+                <View style={styles.templateGroup}>
+                  <Text style={styles.templateGroupLabel}>Template</Text>
+                  <View style={styles.templateRow}>
+                    {availableTemplates.slice(0, 4).map((template) => (
+                      <TouchableOpacity
+                        key={template.id}
+                        onPress={() => {
+                          setSelectedTemplateId(template.id);
+                          void Haptics.selectionAsync();
+                        }}
+                        activeOpacity={0.85}
                         style={[
-                          styles.templateChipText,
+                          styles.templateChip,
                           {
-                            color: selectedFontFamily === font.family ? selectedTemplate.accent : colors.text_secondary,
-                            fontFamily: font.family,
+                            borderColor: selectedTemplateId === template.id ? template.accent : colors.glass_border,
+                            backgroundColor: selectedTemplateId === template.id ? `${template.accent}1F` : colors.glass_fill,
                           },
                         ]}
                       >
-                        {font.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text style={[styles.templateChipText, { color: selectedTemplateId === template.id ? template.accent : colors.text_secondary }]}>
+                          {template.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-                <View style={styles.templateRow}>
-                  {SIZE_OPTIONS.map((size) => (
-                    <TouchableOpacity
-                      key={size.label}
-                      onPress={() => {
-                        setSelectedSizeScale(size.value);
-                        void Haptics.selectionAsync();
-                      }}
-                      activeOpacity={0.85}
-                      style={[
-                        styles.templateChip,
-                        {
-                          borderColor: selectedSizeScale === size.value ? selectedTemplate.accent : colors.glass_border,
-                          backgroundColor: selectedSizeScale === size.value ? `${selectedTemplate.accent}1F` : colors.glass_fill,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.templateChipText, { color: selectedSizeScale === size.value ? selectedTemplate.accent : colors.text_secondary }]}>
-                        {size.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.templateGroup}>
+                  <Text style={styles.templateGroupLabel}>Font</Text>
+                  <View style={styles.templateRow}>
+                    {FONT_OPTIONS.map((font) => (
+                      <TouchableOpacity
+                        key={font.family}
+                        onPress={() => {
+                          setSelectedFontFamily(font.family);
+                          void Haptics.selectionAsync();
+                        }}
+                        activeOpacity={0.85}
+                        style={[
+                          styles.templateChip,
+                          {
+                            borderColor: selectedFontFamily === font.family ? selectedTemplate.accent : colors.glass_border,
+                            backgroundColor: selectedFontFamily === font.family ? `${selectedTemplate.accent}1F` : colors.glass_fill,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.templateChipText,
+                            {
+                              color: selectedFontFamily === font.family ? selectedTemplate.accent : colors.text_secondary,
+                              fontFamily: font.family,
+                            },
+                          ]}
+                        >
+                          {font.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.templateGroup}>
+                  <Text style={styles.templateGroupLabel}>Size</Text>
+                  <View style={styles.templateRow}>
+                    {SIZE_OPTIONS.map((size) => (
+                      <TouchableOpacity
+                        key={size.label}
+                        onPress={() => {
+                          setSelectedSizeScale(size.value);
+                          void Haptics.selectionAsync();
+                        }}
+                        activeOpacity={0.85}
+                        style={[
+                          styles.templateChip,
+                          {
+                            borderColor: selectedSizeScale === size.value ? selectedTemplate.accent : colors.glass_border,
+                            backgroundColor: selectedSizeScale === size.value ? `${selectedTemplate.accent}1F` : colors.glass_fill,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.templateChipText, { color: selectedSizeScale === size.value ? selectedTemplate.accent : colors.text_secondary }]}>
+                          {size.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
                 <TouchableOpacity style={styles.exportOptionRow} onPress={handleExportShare} activeOpacity={0.7}>
                   <Ionicons name="share-outline" size={22} color={colors.accent_violet} />
@@ -653,6 +718,11 @@ export default function CreateModeScreen() {
                 <TouchableOpacity style={styles.exportOptionRow} onPress={handleWhatsAppShare} activeOpacity={0.7}>
                   <Ionicons name="logo-whatsapp" size={22} color={colors.success} />
                   <Text style={styles.exportOptionLabel}>Send via WhatsApp</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.exportOptionRow} onPress={handleSendToPartner} activeOpacity={0.7}>
+                  <Ionicons name="heart-circle-outline" size={22} color={colors.accent_rose} />
+                  <Text style={styles.exportOptionLabel}>Send to Partner Mode</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.exportOptionRow} onPress={handleExportCopy} activeOpacity={0.7}>

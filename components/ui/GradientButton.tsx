@@ -11,9 +11,10 @@ interface GradientButtonProps {
   disabled?: boolean;
   small?: boolean;
   icon?: React.ReactNode;
+  noTopMargin?: boolean;
 }
 
-export default function GradientButton({ label, onPress, style, disabled, small, icon }: GradientButtonProps) {
+export default function GradientButton({ label, onPress, style, disabled, small, icon, noTopMargin }: GradientButtonProps) {
   const { colors, shadows } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -49,6 +50,7 @@ export default function GradientButton({ label, onPress, style, disabled, small,
             styles.gradient,
             shadows.rose_glow,
             small && styles.gradientSmall,
+            noTopMargin && styles.noTopMargin,
             disabled && styles.disabled,
           ]}
         >
@@ -74,6 +76,9 @@ const styles = StyleSheet.create({
   gradientSmall: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
+  },
+  noTopMargin: {
+    marginTop: 0,
   },
   label: {
     fontSize: fontSizes.md,

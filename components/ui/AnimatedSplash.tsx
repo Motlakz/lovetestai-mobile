@@ -99,17 +99,19 @@ export default function AnimatedSplash({ onFinish }: Props) {
   ).current;
 
   useEffect(() => {
+    // Drive both orbs from a single timeline so their paths converge at the same moment,
+    // producing a visible bounce instead of unrelated drifts.
     const bgAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(bgGrad1, {
           toValue: 1,
-          duration: 3000,
+          duration: 3500,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
         Animated.timing(bgGrad1, {
           toValue: 0,
-          duration: 3000,
+          duration: 3500,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
@@ -121,13 +123,13 @@ export default function AnimatedSplash({ onFinish }: Props) {
       Animated.sequence([
         Animated.timing(bgGrad2, {
           toValue: 1,
-          duration: 4000,
+          duration: 3500,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
         Animated.timing(bgGrad2, {
           toValue: 0,
-          duration: 4000,
+          duration: 3500,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
@@ -367,24 +369,36 @@ export default function AnimatedSplash({ onFinish }: Props) {
     outputRange: ['-15deg', '5deg', '0deg'],
   });
 
+  // Orbs travel along intersecting paths and recoil at the midpoint of the loop,
+  // so they appear to bounce off each other instead of drifting in unison.
   const orb1Top = bgGrad1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [H * 0.15, H * 0.25],
+    inputRange: [0, 0.5, 1],
+    outputRange: [H * 0.12, H * 0.38, H * 0.12],
   });
 
   const orb1Left = bgGrad1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [W * 0.1, W * 0.3],
+    inputRange: [0, 0.5, 1],
+    outputRange: [W * 0.05, W * 0.42, W * 0.05],
+  });
+
+  const orb1Scale = bgGrad1.interpolate({
+    inputRange: [0, 0.45, 0.5, 0.55, 1],
+    outputRange: [1, 1.05, 0.88, 1.05, 1],
   });
 
   const orb2Top = bgGrad2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [H * 0.55, H * 0.65],
+    inputRange: [0, 0.5, 1],
+    outputRange: [H * 0.72, H * 0.42, H * 0.72],
   });
 
   const orb2Left = bgGrad2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [W * 0.5, W * 0.7],
+    inputRange: [0, 0.5, 1],
+    outputRange: [W * 0.62, W * 0.28, W * 0.62],
+  });
+
+  const orb2Scale = bgGrad2.interpolate({
+    inputRange: [0, 0.45, 0.5, 0.55, 1],
+    outputRange: [1, 1.05, 0.88, 1.05, 1],
   });
 
   const bgColor = isDark ? '#0D0610' : '#FEF6F8';
@@ -401,6 +415,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
             width: 260,
             height: 260,
             borderRadius: 130,
+            transform: [{ scale: orb1Scale }],
           },
         ]}
       />
@@ -414,6 +429,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
             width: 200,
             height: 200,
             borderRadius: 100,
+            transform: [{ scale: orb2Scale }],
           },
         ]}
       />
@@ -731,6 +747,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 36,
+    fontFamily: 'var(--quicksand)',
     fontWeight: '700' as const,
     letterSpacing: 2,
     textAlign: 'center' as const,

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -31,9 +31,22 @@ import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { useAuthStore } from '@/store/authStore';
+import { usePartnerStore } from '@/store/partnerStore';
 import { useAuthGate } from '@/components/auth/AuthGateModal';
 import { useFeedbackStore } from '@/store/feedbackStore';
 import { buildViralCreationShareText } from '@/services/creationTemplates';
+import type { SavedCreation } from '@/services/db';
+import { deleteUser } from 'firebase/auth';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { auth as firebaseAuth, firestore } from '@/services/firebase';
+import {
+  loadPrefs as loadNotifPrefs,
+  savePrefs as saveNotifPrefs,
+  DEFAULT_NOTIF_PREFS,
+  NOTIF_TIME_GRID,
+  NOTIF_FREQUENCY_OPTIONS,
+  type NotifFrequency,
+} from '@/services/notifications';
 
 const STATUSES = ['Single', 'In a Relationship', "It's Complicated", 'Prefer not to say'];
 
@@ -52,7 +65,7 @@ function createStyles(c: ThemeColors) {
     container: { flex: 1 },
     header: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     profileCard: { padding: spacing.xl, alignItems: 'center' as const, marginBottom: spacing.lg, gap: spacing.sm },
     avatarContainer: { marginBottom: spacing.sm },
     avatarGradient: { width: 72, height: 72, borderRadius: 36, padding: 3 },
@@ -169,6 +182,172 @@ function createStyles(c: ThemeColors) {
     selectionAction: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border },
     selectionActionText: { color: c.text_primary, fontSize: fontSizes.xs, fontWeight: '700' as const },
     selectionDeleteText: { color: c.error },
+    notifModalContent: {
+      width: '100%' as const,
+      maxWidth: 440,
+      maxHeight: '92%' as const,
+      backgroundColor: c.bg_surface,
+      borderRadius: radius.xl,
+      paddingVertical: spacing.xl,
+      paddingHorizontal: spacing.xl,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+    },
+    notifModalScroll: { gap: spacing.lg },
+    notifModalHeader: { alignItems: 'center' as const, gap: spacing.xs, marginBottom: spacing.sm },
+    notifModalIconWrap: {
+      width: 56, height: 56, borderRadius: 28,
+      alignItems: 'center' as const, justifyContent: 'center' as const,
+      backgroundColor: `${c.accent_rose}1F`,
+      borderWidth: 1, borderColor: `${c.accent_rose}55`,
+      marginBottom: spacing.xs,
+    },
+    notifModalSubtitle: { fontSize: fontSizes.sm, color: c.text_muted, textAlign: 'center' as const, paddingHorizontal: spacing.lg },
+    notifEnableRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+    },
+    notifEnableLabel: { fontSize: fontSizes.base, color: c.text_primary, fontWeight: '600' as const },
+    notifEnableHint: { fontSize: fontSizes.xs, color: c.text_muted, marginTop: 2 },
+    notifToggle: {
+      width: 46, height: 28, borderRadius: 14,
+      paddingHorizontal: 3, justifyContent: 'center' as const,
+      backgroundColor: c.glass_border,
+    },
+    notifToggleActive: { backgroundColor: c.accent_rose },
+    notifToggleKnob: {
+      width: 22, height: 22, borderRadius: 11,
+      backgroundColor: c.text_primary,
+    },
+    notifSectionLabel: {
+      color: c.text_muted,
+      fontSize: fontSizes.xs,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase' as const,
+      fontWeight: '700' as const,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    notifPeriodLabel: {
+      color: c.text_secondary,
+      fontSize: fontSizes.xs,
+      fontWeight: '600' as const,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 1,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    notifTimeGrid: {
+      flexDirection: 'row' as const,
+      flexWrap: 'wrap' as const,
+      gap: spacing.xs,
+    },
+    notifTimeCell: {
+      width: '23%' as const,
+      height: 40,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      paddingHorizontal: 4,
+    },
+    notifTimeCellActive: {
+      borderColor: c.accent_rose,
+      backgroundColor: 'rgba(255,61,127,0.16)',
+    },
+    notifTimeCellDisabled: { opacity: 0.4 },
+    notifTimeCellText: { color: c.text_secondary, fontSize: 11, fontWeight: '600' as const, textAlign: 'center' as const, includeFontPadding: false, textAlignVertical: 'center' as const },
+    notifTimeCellTextActive: { color: c.text_primary, fontWeight: '700' as const },
+    notifFreqRow: {
+      flexDirection: 'row' as const,
+      flexWrap: 'wrap' as const,
+      gap: spacing.sm,
+    },
+    notifFreqChip: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+    },
+    notifFreqChipActive: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.14)' },
+    notifFreqChipText: { color: c.text_muted, fontSize: fontSizes.sm, fontWeight: '500' as const },
+    notifFreqChipTextActive: { color: c.text_primary, fontWeight: '600' as const },
+    notifSummaryCard: {
+      padding: spacing.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      gap: spacing.xs,
+    },
+    notifSummaryLabel: { color: c.text_muted, fontSize: fontSizes.xs, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: '600' as const },
+    notifSummaryValue: { color: c.text_primary, fontSize: fontSizes.base, fontWeight: '600' as const },
+    detailModalCard: {
+      width: '100%' as const,
+      maxWidth: 460,
+      maxHeight: '90%' as const,
+      backgroundColor: c.bg_surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      paddingVertical: spacing.xl,
+      paddingHorizontal: spacing.xl,
+    },
+    detailHeader: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: spacing.md,
+      marginBottom: spacing.md,
+      paddingRight: spacing.xl,
+    },
+    detailIconWrap: {
+      width: 44, height: 44, borderRadius: 22,
+      alignItems: 'center' as const, justifyContent: 'center' as const,
+      backgroundColor: `${c.accent_violet}1F`,
+      borderWidth: 1, borderColor: `${c.accent_violet}40`,
+    },
+    detailTitleBlock: { flex: 1 },
+    detailType: { color: c.accent_rose, fontSize: fontSizes.xs, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 1 },
+    detailMeta: { color: c.text_muted, fontSize: fontSizes.xs, marginTop: 2 },
+    detailScroll: {
+      maxHeight: 360,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    detailBody: { color: c.text_primary, fontSize: fontSizes.base, lineHeight: 24 },
+    detailActions: { flexDirection: 'row' as const, gap: spacing.sm, flexWrap: 'wrap' as const },
+    detailActionBtn: {
+      flexGrow: 1,
+      flexBasis: '30%' as const,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+    },
+    detailActionBtnDanger: { borderColor: `${c.error}55`, backgroundColor: `${c.error}14` },
+    detailActionLabel: { color: c.text_primary, fontSize: fontSizes.sm, fontWeight: '600' as const },
+    detailActionLabelDanger: { color: c.error },
   });
 }
 
@@ -182,6 +361,8 @@ export default function ProfileScreen() {
   const { alert, confirm } = useAppAlert();
   const account = useAuthStore((s) => s.account);
   const signOutAccount = useAuthStore((s) => s.signOut);
+  const partnerLink = usePartnerStore((s) => s.link);
+  const disconnectPartner = usePartnerStore((s) => s.disconnect);
   const { openSignIn } = useAuthGate();
   const openManualFeedback = useFeedbackStore((state) => state.openManual);
 
@@ -192,6 +373,26 @@ export default function ProfileScreen() {
   const [showAllCreations, setShowAllCreations] = useState(false);
   const [themeSheetVisible, setThemeSheetVisible] = useState(false);
   const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const [viewingCreation, setViewingCreation] = useState<SavedCreation | null>(null);
+  const [notifEnabled, setNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.enabled);
+  const [notifHour, setNotifHour] = useState(DEFAULT_NOTIF_PREFS.hour);
+  const [notifMinute, setNotifMinute] = useState(DEFAULT_NOTIF_PREFS.minute);
+  const [notifFrequency, setNotifFrequency] = useState<NotifFrequency>(DEFAULT_NOTIF_PREFS.frequency);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const prefs = await loadNotifPrefs();
+        setNotifEnabled(prefs.enabled);
+        setNotifHour(prefs.hour);
+        setNotifMinute(prefs.minute);
+        setNotifFrequency(prefs.frequency);
+      } catch (e) {
+        console.log('Load notif prefs failed:', e);
+      }
+    })();
+  }, []);
 
   const selectionActive = selectedCreationIds.length > 0;
 
@@ -376,6 +577,59 @@ export default function ProfileScreen() {
     });
   }, [resetApp, router, alert]);
 
+  const handleDeleteAccount = useCallback(() => {
+    alert({
+      title: 'Delete account permanently?',
+      message:
+        'This removes your account, your invite code, your partner pair membership, and every creation, prompt, and reflection on this device. This cannot be undone.',
+      icon: 'trash-bin-outline',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (partnerLink) {
+                try { await disconnectPartner(); } catch (e) { console.log('disconnect on delete failed:', e); }
+              }
+              if (firestore && partnerLink?.inviteCode) {
+                try {
+                  await deleteDoc(doc(firestore, 'invites', partnerLink.inviteCode));
+                } catch (e) {
+                  console.log('invite delete failed:', e);
+                }
+              }
+              if (firebaseAuth?.currentUser) {
+                try {
+                  await deleteUser(firebaseAuth.currentUser);
+                } catch (e: any) {
+                  console.log('deleteUser failed:', e);
+                  if (e?.code === 'auth/requires-recent-login') {
+                    toast.info('Please sign in again, then retry deletion.');
+                    await signOutAccount();
+                    resetApp();
+                    router.replace('/onboarding' as any);
+                    return;
+                  }
+                }
+              }
+              await signOutAccount();
+              resetApp();
+              router.replace('/onboarding' as any);
+              toast.success('Account deleted.');
+            } catch (e) {
+              console.log('delete account flow failed:', e);
+              toast.info('Deletion encountered an error. Local data was cleared.');
+              resetApp();
+              router.replace('/onboarding' as any);
+            }
+          },
+        },
+      ],
+    });
+  }, [alert, partnerLink, disconnectPartner, signOutAccount, resetApp, router, toast]);
+
   const handleRateApp = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     openManualFeedback('profile');
@@ -392,24 +646,32 @@ export default function ProfileScreen() {
   }, [alert]);
 
   const handleNotificationPrefs = useCallback(() => {
-    alert({
-      title: 'Notification Preferences',
-      message: 'Choose when to receive daily prompts',
-      icon: 'notifications-outline',
-      buttons: [
-        { text: 'Daily at 9 AM (default)', onPress: () => toast.success('Daily prompts at 9 AM') },
-        { text: 'Daily at 7 PM', onPress: () => toast.success('Daily prompts at 7 PM') },
-        { text: 'Turn Off', style: 'destructive', onPress: () => toast.info('Daily prompt notifications turned off') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    });
-  }, [alert, toast]);
+    void Haptics.selectionAsync();
+    setNotifModalVisible(true);
+  }, []);
+
+  const handleSaveNotifPrefs = useCallback(async () => {
+    try {
+      await saveNotifPrefs({
+        enabled: notifEnabled,
+        hour: notifHour,
+        minute: notifMinute,
+        frequency: notifFrequency,
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success(notifEnabled ? 'Prompt reminders saved.' : 'Prompt reminders turned off.');
+      setNotifModalVisible(false);
+    } catch (e) {
+      console.log('Save notif prefs failed:', e);
+      toast.info('Could not save preferences.');
+    }
+  }, [notifEnabled, notifHour, notifMinute, notifFrequency, toast]);
 
   const handleTwoPlayerInfo = useCallback(() => {
     alert({
       title: 'Two-Player Prompts',
       message:
-        'Sign in with Google, then share your 6-character pair code with someone you love. Once they accept, you both share the same daily prompt. Reflect on it together — your responses stay private to each of you until you choose to share them.',
+        'Start pairing with a demo tester account or Google, then share your 6-character pair code with someone you love. Once they accept, you both share the same daily prompt. Reflect on it together - your responses stay private to each of you until you choose to share them.',
       icon: 'people-outline',
       buttons: [
         { text: 'Open Partner Mode', onPress: () => router.push('/(tabs)/partner' as any) },
@@ -476,8 +738,14 @@ export default function ProfileScreen() {
             ) : null}
             {account && (
               <View style={styles.accountChip}>
-                <Ionicons name="logo-google" size={14} color={colors.accent_rose} />
-                <Text style={styles.accountChipText} numberOfLines={1}>{account.email}</Text>
+                <Ionicons
+                  name={account.provider === 'anonymous' ? 'person-circle-outline' : 'logo-google'}
+                  size={14}
+                  color={colors.accent_rose}
+                />
+                <Text style={styles.accountChipText} numberOfLines={1}>
+                  {account.provider === 'anonymous' ? 'Demo tester' : account.email}
+                </Text>
               </View>
             )}
             <GhostButton label="Edit Profile" onPress={handleOpenEditModal} style={styles.editBtn} />
@@ -525,7 +793,12 @@ export default function ProfileScreen() {
                   activeOpacity={0.85}
                   onLongPress={() => startCreationSelection(creation.id)}
                   onPress={() => {
-                    if (selectionActive) toggleCreationSelection(creation.id);
+                    if (selectionActive) {
+                      toggleCreationSelection(creation.id);
+                    } else {
+                      void Haptics.selectionAsync();
+                      setViewingCreation(creation);
+                    }
                   }}
                 >
                 <GlassCard style={[styles.creationCard, selectedCreationIds.includes(creation.id) && styles.creationCardSelected]}>
@@ -551,16 +824,7 @@ export default function ProfileScreen() {
                     style={styles.creationMenuBtn}
                     onPress={() => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      alert({
-                        title: 'Options',
-                        icon: 'ellipsis-horizontal',
-                        buttons: [
-                          { text: 'Copy', onPress: () => handleCopyCreation(creation.content) },
-                          { text: 'Share', onPress: () => handleShareCreation(creation.content, creation.type) },
-                          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteCreation(creation.id) },
-                          { text: 'Cancel', style: 'cancel' },
-                        ],
-                      });
+                      setViewingCreation(creation);
                     }}
                   >
                     <Ionicons name="ellipsis-horizontal" size={20} color={colors.text_muted} />
@@ -599,8 +863,11 @@ export default function ProfileScreen() {
           {renderSettingsRow('shield-outline', 'Privacy Policy', handlePrivacyPolicy)}
           {account
             ? renderSettingsRow('log-out-outline', 'Sign Out of Account', handleSignOutAccount, undefined, true)
-            : renderSettingsRow('logo-google', 'Sign in with Google', handleSignIn)}
+            : renderSettingsRow('person-circle-outline', 'Start demo or sign in', handleSignIn)}
           {renderSettingsRow('refresh-outline', 'Reset App Data', handleResetApp, undefined, true)}
+          {account
+            ? renderSettingsRow('trash-bin-outline', 'Delete Account', handleDeleteAccount, undefined, true)
+            : null}
 
           <Text style={styles.footer}>
             Love Test AI is for personal growth and entertainment. Not a licensed counselling service.
@@ -694,6 +961,189 @@ export default function ProfileScreen() {
             })}
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={notifModalVisible} transparent animationType="fade" onRequestClose={() => setNotifModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.notifModalContent}>
+            <TouchableOpacity onPress={() => setNotifModalVisible(false)} style={styles.modalClose}>
+              <Ionicons name="close" size={24} color={colors.text_secondary} />
+            </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.notifModalScroll}>
+              <View style={styles.notifModalHeader}>
+                <View style={styles.notifModalIconWrap}>
+                  <Ionicons name="notifications" size={26} color={colors.accent_rose} />
+                </View>
+                <Text style={styles.modalTitle}>Prompt Reminders</Text>
+                <Text style={styles.notifModalSubtitle}>
+                  Pick when you&apos;d like a fresh love prompt and how often to be nudged.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.notifEnableRow}
+                onPress={() => { setNotifEnabled((v) => !v); void Haptics.selectionAsync(); }}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.notifEnableLabel}>Enable reminders</Text>
+                  <Text style={styles.notifEnableHint}>
+                    {notifEnabled ? 'You will see a gentle in-app nudge on schedule.' : 'Reminders are paused.'}
+                  </Text>
+                </View>
+                <View style={[styles.notifToggle, notifEnabled && styles.notifToggleActive]}>
+                  <View style={[styles.notifToggleKnob, { alignSelf: notifEnabled ? 'flex-end' : 'flex-start' }]} />
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.notifSectionLabel}>Preferred Time</Text>
+              {(['morning', 'afternoon', 'evening', 'night'] as const).map((period) => {
+                const cells = NOTIF_TIME_GRID.filter((t) => t.period === period);
+                if (cells.length === 0) return null;
+                const periodLabel = period[0].toUpperCase() + period.slice(1);
+                return (
+                  <View key={period}>
+                    <Text style={styles.notifPeriodLabel}>{periodLabel}</Text>
+                    <View style={styles.notifTimeGrid}>
+                      {cells.map((t) => {
+                        const active = t.hour === notifHour && t.minute === notifMinute;
+                        return (
+                          <TouchableOpacity
+                            key={t.label}
+                            disabled={!notifEnabled}
+                            style={[
+                              styles.notifTimeCell,
+                              active && styles.notifTimeCellActive,
+                              !notifEnabled && styles.notifTimeCellDisabled,
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              setNotifHour(t.hour);
+                              setNotifMinute(t.minute);
+                              void Haptics.selectionAsync();
+                            }}
+                          >
+                            <Text
+                              style={[styles.notifTimeCellText, active && styles.notifTimeCellTextActive]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                            >
+                              {t.label.replace(':00', '')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })}
+
+              <Text style={styles.notifSectionLabel}>How Often</Text>
+              <View style={styles.notifFreqRow}>
+                {NOTIF_FREQUENCY_OPTIONS.map((f) => {
+                  const active = notifFrequency === f.value;
+                  return (
+                    <TouchableOpacity
+                      key={f.value}
+                      disabled={!notifEnabled}
+                      style={[
+                        styles.notifFreqChip,
+                        active && styles.notifFreqChipActive,
+                        !notifEnabled && styles.notifTimeCellDisabled,
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => { setNotifFrequency(f.value); void Haptics.selectionAsync(); }}
+                    >
+                      <Text style={[styles.notifFreqChipText, active && styles.notifFreqChipTextActive]}>
+                        {f.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.notifSummaryCard}>
+                <Text style={styles.notifSummaryLabel}>Summary</Text>
+                <Text style={styles.notifSummaryValue}>
+                  {notifEnabled
+                    ? `${NOTIF_FREQUENCY_OPTIONS.find((f) => f.value === notifFrequency)?.label ?? 'Every day'} · ${NOTIF_TIME_GRID.find((t) => t.hour === notifHour && t.minute === notifMinute)?.label ?? `${String(notifHour).padStart(2, '0')}:${String(notifMinute).padStart(2, '0')}`}`
+                    : 'Reminders off'}
+                </Text>
+              </View>
+
+              <View style={styles.modalActions}>
+                <GradientButton label="Save Preferences" onPress={handleSaveNotifPrefs} />
+                <GhostButton label="Cancel" onPress={() => setNotifModalVisible(false)} />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!viewingCreation}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingCreation(null)}
+      >
+        <View style={styles.modalOverlay}>
+          {viewingCreation && (
+            <View style={styles.detailModalCard}>
+              <TouchableOpacity onPress={() => setViewingCreation(null)} style={styles.modalClose}>
+                <Ionicons name="close" size={24} color={colors.text_secondary} />
+              </TouchableOpacity>
+              <View style={styles.detailHeader}>
+                <View style={styles.detailIconWrap}>
+                  <Ionicons
+                    name={(TOOL_ICONS[viewingCreation.type] || 'create-outline') as any}
+                    size={22}
+                    color={colors.accent_violet}
+                  />
+                </View>
+                <View style={styles.detailTitleBlock}>
+                  <Text style={styles.detailType} numberOfLines={1}>{viewingCreation.type}</Text>
+                  <Text style={styles.detailMeta} numberOfLines={1}>
+                    {new Date(viewingCreation.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {viewingCreation.toName ? ` · For ${viewingCreation.toName}` : ''}
+                  </Text>
+                </View>
+              </View>
+              <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
+                <Text style={styles.detailBody}>{viewingCreation.content}</Text>
+              </ScrollView>
+              <View style={styles.detailActions}>
+                <TouchableOpacity
+                  style={styles.detailActionBtn}
+                  activeOpacity={0.8}
+                  onPress={() => handleCopyCreation(viewingCreation.content)}
+                >
+                  <Ionicons name="copy-outline" size={18} color={colors.text_primary} />
+                  <Text style={styles.detailActionLabel}>Copy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.detailActionBtn}
+                  activeOpacity={0.8}
+                  onPress={() => handleShareCreation(viewingCreation.content, viewingCreation.type)}
+                >
+                  <Ionicons name="share-outline" size={18} color={colors.text_primary} />
+                  <Text style={styles.detailActionLabel}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.detailActionBtn, styles.detailActionBtnDanger]}
+                  activeOpacity={0.8}
+                  onPress={async () => {
+                    const id = viewingCreation.id;
+                    setViewingCreation(null);
+                    await handleDeleteCreation(id);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.error} />
+                  <Text style={[styles.detailActionLabel, styles.detailActionLabelDanger]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
       </Modal>
     </ScreenBackground>
   );

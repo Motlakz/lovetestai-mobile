@@ -168,24 +168,26 @@ function AuthGateSheet({ request, onClose }: { request: GateRequest; onClose: (s
             <View style={[styles.iconBubble, { backgroundColor: `${colors.accent_rose}20`, borderColor: colors.accent_rose }]}>
               <Ionicons name="heart" size={28} color={colors.accent_rose} />
             </View>
-            <Text style={[styles.title, { color: colors.text_primary }]}>Sign in to Love Test AI</Text>
+            <Text style={[styles.title, { color: colors.text_primary }]}>Create your account</Text>
             <Text style={[styles.message, { color: colors.text_secondary }]}>{request.reason}</Text>
 
             {busy ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color={colors.accent_rose} />
-                <Text style={[styles.loadingText, { color: colors.text_secondary }]}>Opening Google…</Text>
+                <Text style={[styles.loadingText, { color: colors.text_secondary }]}>Getting account ready...</Text>
               </View>
             ) : (
-              <GradientButton
-                label="Continue with Google"
-                onPress={handleGoogle}
-                icon={<Ionicons name="logo-google" size={18} color="#fff" />}
-              />
+              <View style={styles.actionStack}>
+                <GradientButton
+                  label="Continue with Google"
+                  onPress={handleGoogle}
+                  icon={<Ionicons name="logo-google" size={18} color="#fff" />}
+                />
+              </View>
             )}
 
             <Text style={[styles.fineprint, { color: colors.text_muted }]}>
-              We use Google to keep things spam-free. Guest mode stays local on this device.
+              Google lets you recover your account and keep the same identity across devices.
             </Text>
             <GhostButton label="Not now" onPress={handleCancel} />
           </GlassCard>
@@ -228,4 +230,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   loadingText: { fontSize: fontSizes.sm },
+  actionStack: { width: '100%', gap: spacing.sm },
 });

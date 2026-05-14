@@ -23,7 +23,8 @@ import { StatusBar } from "expo-status-bar";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import AnimatedSplash from "@/components/ui/AnimatedSplash";
-import { ToastProvider } from "@/components/ui/Toast";
+import { ToastProvider, useToast } from "@/components/ui/Toast";
+import { claimDailyPromptSlot } from "@/services/notifications";
 import { AppAlertProvider } from "@/components/ui/AppAlertModal";
 import { AuthGateProvider } from "@/components/auth/AuthGateModal";
 import FeedbackProvider from "@/components/ui/FeedbackProvider";
@@ -39,6 +40,7 @@ function RootLayoutNav() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const segments = useSegments();
+  const toast = useToast();
   const [showSplash, setShowSplash] = useState(true);
   const [fontsLoaded] = useFonts({
     CormorantGaramond_400Regular,
@@ -53,9 +55,21 @@ function RootLayoutNav() {
   });
 
   useEffect(() => {
-    void useAuthStore.getState().init();
-    void usePartnerStore.getState().init();
+    void (async () => {
+      await useAuthStore.getState().init();
+      await usePartnerStore.getState().init();
+    })();
   }, []);
+
+  useEffect(() => {
+    if (isLoading || !onboardingComplete) return;
+    void (async () => {
+      const fire = await claimDailyPromptSlot();
+      if (fire) {
+        toast.info("Today's love prompt is ready in Daily.");
+      }
+    })();
+  }, [isLoading, onboardingComplete, toast]);
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);

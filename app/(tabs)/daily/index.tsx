@@ -11,8 +11,11 @@ import {
   Pressable,
   Share,
   FlatList,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
@@ -30,6 +33,11 @@ import { DAILY_PROMPTS, PROMPT_CATEGORIES } from '@/mocks/tests';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { fetchPrompts, type PlatformPrompt } from '@/services/aiService';
+import { useAuthStore } from '@/store/authStore';
+import { usePartnerStore } from '@/store/partnerStore';
+import { sharePartnerPrompt, todayExchangeKey } from '@/services/partnerExchange';
+import * as Clipboard from 'expo-clipboard';
+import type { JournalEntry } from '@/services/db';
 
 type DailyTab = 'today' | 'browse' | 'saved' | 'partner';
 
@@ -65,7 +73,7 @@ function formatRelativeDate(dateStr: string): string {
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     greetingSection: { paddingVertical: spacing.lg },
     greeting: { fontSize: fontSizes.md, color: c.text_secondary, fontWeight: '500' as const },
     dateText: { fontSize: fontSizes.sm, color: c.text_muted, letterSpacing: 1.5, textTransform: 'uppercase' as const, marginTop: spacing.xs },
@@ -130,20 +138,91 @@ function createStyles(c: ThemeColors) {
     reflectionDate: { fontSize: fontSizes.xs, color: c.text_muted },
     reflectionText: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 20 },
     bottomSpacer: { height: 40 },
+    detailCenterOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' as const, alignItems: 'center' as const, padding: spacing.xl },
+    detailModalCard: {
+      width: '100%' as const,
+      maxWidth: 460,
+      maxHeight: '90%' as const,
+      backgroundColor: c.bg_surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      paddingVertical: spacing.xl,
+      paddingHorizontal: spacing.xl,
+    },
+    detailClose: { position: 'absolute' as const, top: spacing.md, right: spacing.md, zIndex: 10 },
+    detailEyebrow: { color: c.accent_rose, fontSize: fontSizes.xs, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: spacing.xs, paddingRight: spacing.xl },
+    detailPromptText: { color: c.text_primary, fontSize: fontSizes.md, fontStyle: 'italic' as const, fontWeight: '600' as const, lineHeight: 26, marginBottom: spacing.sm, paddingRight: spacing.xl },
+    detailDateText: { color: c.text_muted, fontSize: fontSizes.xs, marginBottom: spacing.md },
+    detailScrollBox: {
+      maxHeight: 320,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    detailBody: { color: c.text_primary, fontSize: fontSizes.base, lineHeight: 24 },
+    detailEditInput: {
+      height: 150,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.accent_rose,
+      backgroundColor: c.glass_fill,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+      color: c.text_primary,
+      fontSize: fontSizes.base,
+      lineHeight: 24,
+      textAlignVertical: 'top' as const,
+    },
+    detailActions: { flexDirection: 'row' as const, gap: spacing.sm, justifyContent: 'center' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const },
+    detailActionBtn: {
+      width: 48,
+      height: 48,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+    },
+    detailActionBtnText: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: c.glass_border,
+      backgroundColor: c.glass_fill,
+      minWidth: 100,
+    },
+    detailActionBtnTextPrimary: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.14)' },
+    detailActionBtnLabel: { fontSize: fontSizes.sm, fontWeight: '600' as const, color: c.text_primary },
+    detailActionBtnLabelPrimary: { color: c.accent_rose },
+    detailActionPrimary: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.14)' },
+    detailActionDanger: { borderColor: `${c.error}55`, backgroundColor: `${c.error}14` },
   });
 }
 
 export default function DailyScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     profile, streakData, todayPromptIndex, saveJournalEntry,
     savePrompt, savedPrompts, deleteSavedPrompt,
-    journalEntries, deleteJournalEntry,
+    journalEntries, deleteJournalEntry, updateJournalEntry,
   } = useApp();
   const toast = useToast();
   const { confirm } = useAppAlert();
+  const account = useAuthStore((s) => s.account);
+  const partnerLink = usePartnerStore((s) => s.link);
 
   const [activeTab, setActiveTab] = useState<DailyTab>('today');
   const [showJournal, setShowJournal] = useState(false);
@@ -154,6 +233,9 @@ export default function DailyScreen() {
   const [detailJournal, setDetailJournal] = useState('');
   const [detailReflecting, setDetailReflecting] = useState(false);
   const [platformPrompts, setPlatformPrompts] = useState<PlatformPrompt[] | null>(null);
+  const [viewingEntry, setViewingEntry] = useState<JournalEntry | null>(null);
+  const [isEditingEntry, setIsEditingEntry] = useState(false);
+  const [editingEntryText, setEditingEntryText] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const promptSource = platformPrompts && platformPrompts.length > 0 ? platformPrompts : DAILY_PROMPTS;
@@ -234,6 +316,30 @@ export default function DailyScreen() {
     }
   }, [detailPrompt]);
 
+  const handleSharePartnerPrompt = useCallback(async (prompt: PromptDetail) => {
+    if (!account || !partnerLink?.pairId) {
+      toast.warning('Pair with someone before sharing partner prompts.');
+      router.push('/(tabs)/partner' as any);
+      return;
+    }
+
+    try {
+      await sharePartnerPrompt({
+        pairId: partnerLink.pairId,
+        exchangeId: todayExchangeKey(),
+        promptText: prompt.text,
+        promptCategory: prompt.category,
+        account,
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success('Prompt shared to Partner Mode.');
+      router.push('/(tabs)/partner' as any);
+    } catch (e) {
+      console.log('partner prompt share failed:', e);
+      toast.error('Could not share this prompt to Partner Mode.');
+    }
+  }, [account, partnerLink?.pairId, router, toast]);
+
   const handleDetailReflect = useCallback(() => {
     if (!detailPrompt) return;
     if (!detailReflecting) { setDetailReflecting(true); return; }
@@ -257,6 +363,70 @@ export default function DailyScreen() {
     deleteJournalEntry(id);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [deleteJournalEntry, confirm]);
+
+  const handleOpenJournalEntry = useCallback((entry: JournalEntry) => {
+    void Haptics.selectionAsync();
+    setViewingEntry(entry);
+    setEditingEntryText(entry.entry);
+    setIsEditingEntry(false);
+  }, []);
+
+  const handleCloseJournalDetail = useCallback(() => {
+    setViewingEntry(null);
+    setIsEditingEntry(false);
+    setEditingEntryText('');
+  }, []);
+
+  const handleCopyJournalEntry = useCallback(async (entry: JournalEntry) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const text = `${entry.promptText}\n\n${entry.entry}`;
+    if (Platform.OS === 'web') {
+      try { await navigator.clipboard.writeText(text); } catch { console.log('Copy failed'); }
+    } else {
+      await Clipboard.setStringAsync(text);
+    }
+    toast.success('Reflection copied.');
+  }, [toast]);
+
+  const handleShareJournalEntry = useCallback(async (entry: JournalEntry) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const text = `Reflecting on: "${entry.promptText}"\n\n${entry.entry}`;
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          await navigator.share({ title: 'My Reflection', text });
+        } else {
+          try { await navigator.clipboard.writeText(text); } catch { console.log('Share copy failed'); }
+          toast.success('Reflection copied to clipboard.');
+        }
+      } else {
+        await Share.share({ message: text, title: 'My Reflection' });
+      }
+    } catch (e: any) {
+      if (e?.message !== 'User did not share') console.log('Share error:', e);
+    }
+  }, [toast]);
+
+  const handleSaveJournalEdit = useCallback(() => {
+    if (!viewingEntry) return;
+    const trimmed = editingEntryText.trim();
+    if (!trimmed) {
+      toast.info('Reflection cannot be empty.');
+      return;
+    }
+    updateJournalEntry(viewingEntry.id, { entry: trimmed });
+    setViewingEntry({ ...viewingEntry, entry: trimmed });
+    setIsEditingEntry(false);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.success('Reflection updated.');
+  }, [viewingEntry, editingEntryText, updateJournalEntry, toast]);
+
+  const handleDeleteFromDetail = useCallback(async () => {
+    if (!viewingEntry) return;
+    const id = viewingEntry.id;
+    handleCloseJournalDetail();
+    await handleDeleteJournalEntry(id);
+  }, [viewingEntry, handleCloseJournalDetail, handleDeleteJournalEntry]);
 
   const filteredBrowsePrompts = useMemo(() => {
     const allPast = promptSource.filter((_, i) => i !== todayPromptIndex % promptSource.length);
@@ -339,16 +509,26 @@ export default function DailyScreen() {
         <>
           <SectionTitle title="My Reflections" style={styles.sectionTitle} />
           {displayedEntries.map((entry) => (
-            <GlassCard key={entry.id} style={styles.journalEntryCard}>
-              <View style={styles.journalEntryHeader}>
-                <Text style={styles.journalEntryDate}>{formatRelativeDate(entry.date)}</Text>
-                <TouchableOpacity onPress={() => handleDeleteJournalEntry(entry.id)} style={styles.journalEntryDelete}>
-                  <Ionicons name="trash-outline" size={16} color={colors.text_muted} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.journalEntryPrompt} numberOfLines={1}>{entry.promptText}</Text>
-              <Text style={styles.journalEntryText} numberOfLines={4}>{entry.entry}</Text>
-            </GlassCard>
+            <TouchableOpacity
+              key={entry.id}
+              activeOpacity={0.85}
+              onPress={() => handleOpenJournalEntry(entry)}
+            >
+              <GlassCard style={styles.journalEntryCard}>
+                <View style={styles.journalEntryHeader}>
+                  <Text style={styles.journalEntryDate}>{formatRelativeDate(entry.date)}</Text>
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation?.(); handleDeleteJournalEntry(entry.id); }}
+                    style={styles.journalEntryDelete}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={colors.text_muted} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.journalEntryPrompt} numberOfLines={1}>{entry.promptText}</Text>
+                <Text style={styles.journalEntryText} numberOfLines={4}>{entry.entry}</Text>
+              </GlassCard>
+            </TouchableOpacity>
           ))}
           {journalEntries.length > 3 && (
             <GhostButton
@@ -434,14 +614,40 @@ export default function DailyScreen() {
   );
 
   const renderPartner = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="happy-outline" size={40} color={colors.accent_rose} />
-      <Text style={styles.emptyTitle}>Partner Prompts</Text>
-      <Text style={styles.emptyText}>
-        Pair with someone to swap daily prompts and compare reflections. Mutual responses unlock once both of you sign in.
-      </Text>
-      <GhostButton label="Learn More" onPress={() => { void Haptics.selectionAsync(); /* TODO: route to partner tab once auth/invite ready */ }} />
-    </View>
+    <>
+      <GlassCard style={styles.promptCard}>
+        <GoldBadge label="PARTNER PROMPT" />
+        <GoldDivider />
+        <Text style={styles.promptText}>{todayPrompt.text}</Text>
+        <Text style={styles.promptMeta}>{todayPrompt.category.toUpperCase()} Â· SHARED EXCHANGE</Text>
+        <View style={styles.promptActions}>
+          <GradientButton
+            label={partnerLink?.pairId ? 'Share prompt' : 'Pair first'}
+            onPress={() => handleSharePartnerPrompt({ text: todayPrompt.text, category: todayPrompt.category })}
+          />
+          <GhostButton label="Open Partner Mode" onPress={() => router.push('/(tabs)/partner' as any)} />
+        </View>
+      </GlassCard>
+
+      <SectionTitle title="Browse for Two" style={styles.sectionTitle} />
+      <View style={styles.browseList}>
+        {filteredBrowsePrompts.slice(0, 6).map((prompt, i) => (
+          <GlassCard key={`${prompt.text}-${i}`} style={styles.promptListItem}>
+            <Ionicons name="people-outline" size={20} color={colors.accent_violet} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.promptListText} numberOfLines={3}>{prompt.text}</Text>
+              <Text style={styles.promptListCategory}>{prompt.category}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSharePartnerPrompt({ text: prompt.text, category: prompt.category })}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="share-social-outline" size={22} color={colors.accent_rose} />
+            </TouchableOpacity>
+          </GlassCard>
+        ))}
+      </View>
+    </>
   );
 
   const detailAlreadySaved = useMemo(() => {
@@ -539,6 +745,14 @@ export default function DailyScreen() {
                           onPress={handleDetailSave}
                         />
                         <GhostButton label="Share" onPress={handleDetailShare} />
+                        <GhostButton
+                          label="Share to Partner"
+                          onPress={() => {
+                            if (!detailPrompt) return;
+                            void handleSharePartnerPrompt(detailPrompt);
+                            closePromptDetail();
+                          }}
+                        />
                       </>
                     )}
                   </View>
@@ -546,6 +760,108 @@ export default function DailyScreen() {
               )}
             </Pressable>
           </Pressable>
+        </Modal>
+
+        <Modal
+          visible={!!viewingEntry}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCloseJournalDetail}
+        >
+          <KeyboardAvoidingView
+            style={styles.detailCenterOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            {viewingEntry && (
+              <View style={styles.detailModalCard}>
+                <TouchableOpacity onPress={handleCloseJournalDetail} style={styles.detailClose} hitSlop={10}>
+                  <Ionicons name="close" size={24} color={colors.text_secondary} />
+                </TouchableOpacity>
+                <Text style={styles.detailEyebrow}>Reflection</Text>
+                <Text style={styles.detailPromptText}>{viewingEntry.promptText}</Text>
+                <Text style={styles.detailDateText}>{formatRelativeDate(viewingEntry.date)}</Text>
+
+                {isEditingEntry ? (
+                  <TextInput
+                    style={styles.detailEditInput}
+                    value={editingEntryText}
+                    onChangeText={setEditingEntryText}
+                    multiline
+                    autoFocus
+                    placeholder="Edit your reflection…"
+                    placeholderTextColor={colors.text_muted}
+                  />
+                ) : (
+                  <ScrollView style={styles.detailScrollBox} showsVerticalScrollIndicator={false}>
+                    <Text style={styles.detailBody}>{viewingEntry.entry}</Text>
+                  </ScrollView>
+                )}
+
+                <View style={styles.detailActions}>
+                  {isEditingEntry ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.detailActionBtnText, styles.detailActionBtnTextPrimary]}
+                        activeOpacity={0.8}
+                        onPress={handleSaveJournalEdit}
+                        accessibilityLabel="Save"
+                      >
+                        <Ionicons name="checkmark-outline" size={18} color={colors.accent_rose} />
+                        <Text style={styles.detailActionBtnLabelPrimary}>Save</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.detailActionBtnText}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setIsEditingEntry(false);
+                          setEditingEntryText(viewingEntry.entry);
+                        }}
+                        accessibilityLabel="Cancel"
+                      >
+                        <Ionicons name="close-outline" size={18} color={colors.text_primary} />
+                        <Text style={styles.detailActionBtnLabel}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.detailActionBtn}
+                        activeOpacity={0.8}
+                        onPress={() => { setIsEditingEntry(true); void Haptics.selectionAsync(); }}
+                        accessibilityLabel="Edit"
+                      >
+                        <Ionicons name="create-outline" size={22} color={colors.text_primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.detailActionBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleCopyJournalEntry(viewingEntry)}
+                        accessibilityLabel="Copy"
+                      >
+                        <Ionicons name="copy-outline" size={22} color={colors.text_primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.detailActionBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleShareJournalEntry(viewingEntry)}
+                        accessibilityLabel="Share"
+                      >
+                        <Ionicons name="share-outline" size={22} color={colors.text_primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, styles.detailActionDanger]}
+                        activeOpacity={0.8}
+                        onPress={handleDeleteFromDetail}
+                        accessibilityLabel="Delete"
+                      >
+                        <Ionicons name="trash-outline" size={22} color={colors.error} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </ScreenBackground>

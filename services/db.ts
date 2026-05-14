@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Profile {
@@ -51,8 +52,9 @@ export interface AuthAccount {
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
-  provider?: 'google' | 'guest' | string;
+  provider?: 'google' | 'anonymous' | 'guest' | string;
   createdAt: string;
+  deviceId?: string;
 }
 
 const EMPTY_PROFILE: Profile = { name: '', relationshipStatus: '', dateOfBirth: '', intent: '' };
@@ -259,6 +261,14 @@ export async function persistAuthAccount(account: AuthAccount | null): Promise<v
   await setSetting('auth_account', account);
 }
 
+export async function getOrCreateDeviceId(): Promise<string> {
+  const existing = await getSetting<string>('device_id');
+  if (existing) return existing;
+  const id = Crypto.randomUUID();
+  await setSetting('device_id', id);
+  return id;
+}
+
 export interface PartnerLink {
   inviteCode: string;
   partnerCode: string | null;
@@ -275,6 +285,29 @@ export async function loadPartnerLink(): Promise<PartnerLink | null> {
 
 export async function persistPartnerLink(link: PartnerLink | null): Promise<void> {
   await setSetting('partner_link', link);
+}
+
+export interface PersistedNotifPrefs {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  frequency: 'daily' | '3x_week' | 'weekly' | 'monthly';
+}
+
+export async function loadNotifPrefs(): Promise<PersistedNotifPrefs | null> {
+  return getSetting<PersistedNotifPrefs>('notif_prefs');
+}
+
+export async function persistNotifPrefs(prefs: PersistedNotifPrefs | null): Promise<void> {
+  await setSetting('notif_prefs', prefs);
+}
+
+export async function getDailyPromptLock(): Promise<string | null> {
+  return getSetting<string>('daily_prompt_lock');
+}
+
+export async function setDailyPromptLock(dateKey: string): Promise<void> {
+  await setSetting('daily_prompt_lock', dateKey);
 }
 
 export async function insertCreation(c: SavedCreation): Promise<void> {

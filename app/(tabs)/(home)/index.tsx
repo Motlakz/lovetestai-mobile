@@ -37,7 +37,7 @@ interface FeatureCard {
 function createStyles(c: ThemeColors, _s: ThemeShadows) {
   return StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
+    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
     greetingSection: { paddingVertical: spacing.lg },
     greeting: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const },
     greetingSub: { fontSize: fontSizes.sm, color: c.text_secondary, marginTop: spacing.xs },

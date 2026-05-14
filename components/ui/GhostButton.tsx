@@ -8,20 +8,21 @@ interface GhostButtonProps {
   onPress: () => void;
   style?: ViewStyle;
   icon?: React.ReactNode;
+  small?: boolean;
 }
 
-export default function GhostButton({ label, onPress, style, icon }: GhostButtonProps) {
+export default function GhostButton({ label, onPress, style, icon, small }: GhostButtonProps) {
   const { colors } = useTheme();
 
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={[styles.button, { borderColor: colors.glass_border }, style]}
+      style={[styles.button, small && styles.buttonSmall, { borderColor: colors.glass_border }, style]}
       testID="ghost-button"
     >
       {icon && icon}
-      <Text style={[styles.label, { color: colors.text_secondary }]}>{label}</Text>
+      <Text style={[styles.label, small && styles.labelSmall, { color: colors.text_secondary }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -37,8 +38,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     gap: spacing.sm,
   },
+  buttonSmall: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
   label: {
     fontSize: fontSizes.base,
     fontWeight: '400' as const,
+  },
+  labelSmall: {
+    fontSize: fontSizes.sm,
   },
 });

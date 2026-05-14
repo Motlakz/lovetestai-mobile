@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Share, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -14,13 +14,34 @@ import { useTheme } from '@/context/ThemeContext';
 import { fontSizes, radius, spacing } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { usePartnerStore } from '@/store/partnerStore';
-import { useAuthGate } from '@/components/auth/AuthGateModal';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { useApp } from '@/context/AppContext';
 import { DAILY_PROMPTS } from '@/mocks/tests';
+import {
+  sharePartnerReflection,
+  subscribeToPartnerExchange,
+  subscribeToPartnerShares,
+  todayExchangeKey,
+  type PartnerExchange,
+  type PartnerShare,
+} from '@/services/partnerExchange';
 
 const CODE_RE = /^[A-Z0-9]{6}$/;
+type PairTab = 'create' | 'enter';
+
+function mergeExchangeSnapshot(current: PartnerExchange | null, incoming: PartnerExchange | null): PartnerExchange | null {
+  if (!incoming) return current;
+  return {
+    ...incoming,
+    promptText: incoming.promptText ?? current?.promptText,
+    promptCategory: incoming.promptCategory ?? current?.promptCategory,
+    responses: {
+      ...(current?.responses ?? {}),
+      ...(incoming.responses ?? {}),
+    },
+  };
+}
 
 export default function PartnerLiteScreen() {
   const insets = useSafeAreaInsets();
@@ -29,65 +50,120 @@ export default function PartnerLiteScreen() {
   const toast = useToast();
   const { confirm } = useAppAlert();
   const account = useAuthStore((s) => s.account);
+  const isAuthLoading = useAuthStore((s) => s.isLoading);
   const link = usePartnerStore((s) => s.link);
   const ensureInviteCode = usePartnerStore((s) => s.ensureInviteCode);
+  const regenerateInviteCode = usePartnerStore((s) => s.regenerateInviteCode);
   const acceptCode = usePartnerStore((s) => s.acceptCode);
   const disconnect = usePartnerStore((s) => s.disconnect);
-  const { openSignIn } = useAuthGate();
-  const { todayPromptIndex, savedCreations, completedTests, streakData } = useApp();
+  const { todayPromptIndex, profile } = useApp();
   const [codeInput, setCodeInput] = useState('');
   const [labelInput, setLabelInput] = useState('');
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [isSavingReflection, setIsSavingReflection] = useState(false);
+  const [activeTab, setActiveTab] = useState<PairTab>('create');
+  const [reflectionText, setReflectionText] = useState('');
+  const [promptExchange, setPromptExchange] = useState<PartnerExchange | null>(null);
+  const [shares, setShares] = useState<PartnerShare[]>([]);
 
   const isPaired = !!link?.pairedAt && !!link.partnerCode;
 
-  useEffect(() => {
-    if (account && !link?.inviteCode) {
-      void ensureInviteCode();
-    }
-  }, [account, link?.inviteCode, ensureInviteCode]);
-
   const todayPrompt = useMemo(() => DAILY_PROMPTS[todayPromptIndex % DAILY_PROMPTS.length], [todayPromptIndex]);
-
-  const loveScore = useMemo(() => {
-    let score = 50;
-    score += Math.min(streakData.streak * 2, 20);
-    score += Math.min(savedCreations.length * 3, 15);
-    score += Math.min(completedTests * 5, 15);
-    return Math.min(score, 100);
-  }, [streakData.streak, savedCreations.length, completedTests]);
-
-  const scoreCopy = useMemo(() => {
-    if (loveScore >= 80) return 'Amazing! Keep this glow.';
-    if (loveScore >= 60) return 'Great progress together.';
-    return 'Start creating to grow your score.';
-  }, [loveScore]);
-
+  const todayKey = useMemo(() => todayExchangeKey(), []);
+  const activePromptText = promptExchange?.promptText || todayPrompt.text;
+  const activePromptCategory = promptExchange?.promptCategory || todayPrompt.category;
+  const myResponse = account ? promptExchange?.responses?.[account.accountId]?.text ?? '' : '';
+  const myDisplayName = profile.name.trim() || account?.displayName || account?.email || 'You';
+  const partnerResponse = useMemo(() => {
+    if (!promptExchange?.responses || !account) return '';
+    const entries = Object.entries(promptExchange.responses);
+    const other = entries.find(([uid]) => uid !== account.accountId);
+    return other?.[1]?.text ?? '';
+  }, [account, promptExchange?.responses]);
+  const partnerDisplayName = useMemo(() => {
+    if (!promptExchange?.responses || !account) return link?.partnerLabel ?? link?.partnerEmail ?? 'Partner';
+    const entries = Object.entries(promptExchange.responses);
+    const other = entries.find(([uid]) => uid !== account.accountId);
+    return other?.[1]?.displayName || link?.partnerLabel || link?.partnerEmail || 'Partner';
+  }, [account, link?.partnerEmail, link?.partnerLabel, promptExchange?.responses]);
+  const responseKeys = useMemo(() => Object.keys(promptExchange?.responses ?? {}), [promptExchange?.responses]);
   const achievements = useMemo(() => ([
     {
       id: 'first_creation',
-      label: 'First Spark',
+      label: 'First Share',
       icon: 'sparkles' as const,
-      earned: savedCreations.length >= 1,
+      earned: !!myResponse,
     },
     {
       id: 'streak_7',
-      label: '7-Day Streak',
+      label: 'Both Replied',
       icon: 'flame' as const,
-      earned: streakData.streak >= 7,
+      earned: !!myResponse && !!partnerResponse,
     },
     {
       id: 'tests_3',
-      label: 'Three Tests',
+      label: 'Prompt Live',
       icon: 'ribbon' as const,
-      earned: completedTests >= 3,
+      earned: !!promptExchange?.promptText,
     },
-  ]), [savedCreations.length, streakData.streak, completedTests]);
+  ]), [myResponse, partnerResponse, promptExchange?.promptText]);
 
-  const handleSignIn = useCallback(async () => {
+  useEffect(() => {
+    if (!account || !link?.pairId || !link.pairId.includes(account.accountId)) {
+      setPromptExchange(null);
+      return;
+    }
+
+    const unsubscribe = subscribeToPartnerExchange(link.pairId, todayKey, (next) => {
+      setPromptExchange((current) => mergeExchangeSnapshot(current, next));
+      const savedText = next?.responses?.[account.accountId]?.text;
+      if (savedText) setReflectionText((current) => current || savedText);
+    }, (e) => {
+      console.log('exchange listener:', e);
+      toast.error('Could not load partner exchange.');
+    });
+
+    return unsubscribe;
+  }, [account, link?.pairId, todayKey, toast]);
+
+  useEffect(() => {
+    if (!account || !link?.pairId || !link.pairId.includes(account.accountId)) {
+      setShares([]);
+      return;
+    }
+    const unsubscribe = subscribeToPartnerShares(link.pairId, setShares, (e) => {
+      console.log('shares listener:', e);
+    });
+    return unsubscribe;
+  }, [account, link?.pairId]);
+
+  const handleCreateInvite = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const ok = await openSignIn();
-    if (ok) toast.success('Account ready. Generate an invite below.');
-  }, [openSignIn, toast]);
+    setIsCreatingInvite(true);
+    try {
+      await ensureInviteCode();
+      toast.success('Pair code ready.');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not create your invite code.');
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  }, [ensureInviteCode, toast]);
+
+  const handleRegenerateInvite = useCallback(async () => {
+    const ok = await confirm('Generate a new code?', 'The previous code will no longer be shown on this device.');
+    if (!ok) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsCreatingInvite(true);
+    try {
+      await regenerateInviteCode();
+      toast.success('New pair code ready.');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not generate a new code.');
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  }, [confirm, regenerateInviteCode, toast]);
 
   const handleCopyInvite = useCallback(async () => {
     if (!link?.inviteCode) return;
@@ -151,7 +227,7 @@ export default function PartnerLiteScreen() {
 
   const handleSharePrompt = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const text = `Today's reflection from Love Test AI:\n\n"${todayPrompt.text}"\n\nReply with your reflection and I'll share mine.`;
+    const text = `Today's reflection from Love Test AI:\n\n"${activePromptText}"\n\nReply with your reflection and I'll share mine.`;
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.share) {
         await navigator.share({ title: 'A prompt to share', text });
@@ -164,14 +240,63 @@ export default function PartnerLiteScreen() {
     } catch (e: any) {
       if (e?.message !== 'User did not share') console.log('Share error:', e);
     }
-  }, [todayPrompt, toast]);
+  }, [activePromptText, toast]);
+
+  const handleSaveReflection = useCallback(async () => {
+    const text = reflectionText.trim();
+    if (!text) {
+      toast.warning('Write a reflection first.');
+      return;
+    }
+    if (!account || !link?.pairId) {
+      toast.error('Pair is not connected.');
+      return;
+    }
+    if (!link.pairId.includes(account.accountId)) {
+      toast.error('This pair belongs to a previous guest identity. Disconnect and pair again.');
+      return;
+    }
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsSavingReflection(true);
+    try {
+      await sharePartnerReflection({
+        pairId: link.pairId,
+        exchangeId: todayKey,
+        promptText: activePromptText,
+        promptCategory: activePromptCategory,
+        account,
+        displayName: myDisplayName,
+        text,
+      });
+      setPromptExchange((prev) => ({
+        ...prev,
+        promptText: activePromptText,
+        promptCategory: activePromptCategory,
+        responses: {
+          ...(prev?.responses ?? {}),
+          [account.accountId]: {
+            displayName: myDisplayName,
+            text,
+          },
+        },
+      }));
+      setReflectionText('');
+      toast.success('Reflection shared in Partner Mode.');
+    } catch (e) {
+      console.log('reflection write failed:', e);
+      toast.error('Could not share this reflection.');
+    } finally {
+      setIsSavingReflection(false);
+    }
+  }, [account, activePromptCategory, activePromptText, link?.pairId, myDisplayName, reflectionText, todayKey, toast]);
 
   const codeChars = useMemo(() => (link?.inviteCode ?? '').split(''), [link?.inviteCode]);
 
   return (
     <ScreenBackground>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.lg, paddingBottom: spacing.md }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -186,7 +311,7 @@ export default function PartnerLiteScreen() {
           <View style={[styles.guideStrip, { backgroundColor: `${colors.accent_violet}12`, borderColor: `${colors.accent_violet}40` }]}>
             <View style={styles.guideStep}>
               <View style={[styles.stepDot, { backgroundColor: colors.accent_violet }]}><Text style={styles.stepDotText}>1</Text></View>
-              <Text style={[styles.stepLabel, { color: colors.text_secondary }]}>Sign in</Text>
+              <Text style={[styles.stepLabel, { color: colors.text_secondary }]}>Start</Text>
             </View>
             <View style={[styles.stepDivider, { backgroundColor: `${colors.accent_violet}40` }]} />
             <View style={styles.guideStep}>
@@ -201,63 +326,102 @@ export default function PartnerLiteScreen() {
           </View>
         )}
 
-        {!account && (
+        {!account && isAuthLoading && (
           <GlassCard style={styles.card}>
-            <Ionicons name="lock-closed-outline" size={28} color={colors.accent_violet} />
-            <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Sign in to invite a partner</Text>
+            <Ionicons name="hourglass-outline" size={28} color={colors.accent_violet} />
+            <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Preparing your identity...</Text>
             <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
-              Pairing needs an account so we can sync prompts between both of you. Browsing daily prompts on your own does not.
+              Setting up Partner Mode on this device. This only takes a moment.
             </Text>
-            <GradientButton label="Sign in to continue" onPress={handleSignIn} />
-            <GhostButton label="Browse prompts alone" onPress={() => router.push('/(tabs)/daily' as any)} />
           </GlassCard>
         )}
 
         {account && !isPaired && (
-          <>
-            <GlassCard style={styles.card}>
-              <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Your pair code</Text>
-              <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
-                Share this code with the person you want to reflect with. They enter it on their device to pair.
-              </Text>
-              <View style={[styles.codeBlock, { borderColor: colors.accent_gold, backgroundColor: `${colors.accent_gold}10` }]}>
-                {codeChars.map((ch, i) => (
-                  <View key={i} style={[styles.codeChar, { borderColor: colors.glass_border, backgroundColor: colors.glass_fill }]}>
-                    <Text style={[styles.codeCharText, { color: colors.text_primary }]}>{ch}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.rowActions}>
-                <GhostButton label="Copy" onPress={handleCopyInvite} style={styles.flexBtn} />
-                <GradientButton label="Share invite" onPress={handleShareInvite} small />
-              </View>
-            </GlassCard>
+          <GlassCard style={styles.card}>
+            <View style={[styles.segmented, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border }]}>
+              {(['create', 'enter'] as PairTab[]).map((tab) => {
+                const active = activeTab === tab;
+                return (
+                  <Pressable
+                    key={tab}
+                    onPress={() => {
+                      setActiveTab(tab);
+                      void Haptics.selectionAsync();
+                    }}
+                    style={[
+                      styles.segment,
+                      active && { backgroundColor: `${colors.accent_rose}22`, borderColor: `${colors.accent_rose}66` },
+                    ]}
+                  >
+                    <Ionicons
+                      name={tab === 'create' ? 'add-circle-outline' : 'keypad-outline'}
+                      size={18}
+                      color={active ? colors.accent_rose : colors.text_secondary}
+                    />
+                    <Text style={[styles.segmentText, { color: active ? colors.text_primary : colors.text_secondary }]}>
+                      {tab === 'create' ? 'Create code' : 'Enter code'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-            <GlassCard style={styles.card}>
-              <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Enter their code</Text>
-              <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
-                Got a pair code from someone? Paste it below to start sharing prompts.
-              </Text>
-              <TextInput
-                value={codeInput}
-                onChangeText={(t) => setCodeInput(t.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase())}
-                placeholder="A1B2C3"
-                placeholderTextColor={colors.text_muted}
-                autoCapitalize="characters"
-                maxLength={6}
-                style={[styles.input, styles.codeInput, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border, color: colors.text_primary }]}
-              />
-              <TextInput
-                value={labelInput}
-                onChangeText={setLabelInput}
-                placeholder="Their name (optional)"
-                placeholderTextColor={colors.text_muted}
-                maxLength={40}
-                style={[styles.input, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border, color: colors.text_primary }]}
-              />
-              <GradientButton label="Pair now" onPress={handleAcceptCode} disabled={!CODE_RE.test(codeInput)} />
-            </GlassCard>
-          </>
+            {activeTab === 'create' ? (
+              <>
+                <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Create a pair code</Text>
+                <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
+                  Generate a code and share it with the other tester.
+                </Text>
+                {link?.inviteCode ? (
+                  <>
+                    <View style={[styles.codeBlock, { borderColor: colors.accent_gold, backgroundColor: `${colors.accent_gold}10` }]}>
+                      {codeChars.map((ch, i) => (
+                        <View key={i} style={[styles.codeChar, { borderColor: colors.glass_border, backgroundColor: colors.glass_fill }]}>
+                          <Text style={[styles.codeCharText, { color: colors.text_primary }]}>{ch}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  <View style={styles.rowActions}>
+                    <GhostButton label="Copy" onPress={handleCopyInvite} small style={styles.inviteActionBtn} />
+                    <GradientButton label="Share" onPress={handleShareInvite} small noTopMargin style={styles.inviteActionBtn} />
+                  </View>
+                  <GhostButton label="Generate new code" onPress={handleRegenerateInvite} />
+                </>
+                ) : (
+                  <GradientButton
+                    label={isCreatingInvite ? 'Creating...' : 'Create pair code'}
+                    onPress={handleCreateInvite}
+                    disabled={isCreatingInvite}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Enter their code</Text>
+                <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
+                  Paste the 6-character code from the other device.
+                </Text>
+                <TextInput
+                  value={codeInput}
+                  onChangeText={(t) => setCodeInput(t.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase())}
+                  placeholder="A1B2C3"
+                  placeholderTextColor={colors.text_muted}
+                  autoCapitalize="characters"
+                  maxLength={6}
+                  style={[styles.input, styles.codeInput, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border, color: colors.text_primary }]}
+                />
+                <TextInput
+                  value={labelInput}
+                  onChangeText={setLabelInput}
+                  placeholder="Their name (optional)"
+                  placeholderTextColor={colors.text_muted}
+                  maxLength={40}
+                  style={[styles.input, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border, color: colors.text_primary }]}
+                />
+                <GradientButton label="Pair now" onPress={handleAcceptCode} disabled={!CODE_RE.test(codeInput)} />
+              </>
+            )}
+          </GlassCard>
         )}
 
         {account && isPaired && link && (
@@ -265,7 +429,7 @@ export default function PartnerLiteScreen() {
             <GlassCard style={styles.card}>
               <View style={styles.pairedBadge}>
                 <View style={[styles.dot, { backgroundColor: colors.success }]} />
-                <Text style={[styles.pairedLabel, { color: colors.success }]}>Paired</Text>
+                <Text style={[styles.pairedLabel, { color: colors.success }]}>Live pair</Text>
               </View>
               <View style={styles.coupleRow}>
                 <LinearGradient
@@ -274,7 +438,7 @@ export default function PartnerLiteScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 >
                   <Text style={styles.avatarInitial}>
-                    {(account.displayName ?? account.email ?? 'Y').charAt(0).toUpperCase()}
+                    {myDisplayName.charAt(0).toUpperCase()}
                   </Text>
                 </LinearGradient>
                 <LinearGradient
@@ -290,36 +454,34 @@ export default function PartnerLiteScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 >
                   <Text style={styles.avatarInitial}>
-                    {(link.partnerLabel ?? link.partnerEmail ?? 'P').charAt(0).toUpperCase()}
+                    {partnerDisplayName.charAt(0).toUpperCase()}
                   </Text>
                 </LinearGradient>
               </View>
               <Text style={[styles.coupleName, { color: colors.text_primary }]}>
-                You & {link.partnerLabel ?? 'your partner'}
+                {myDisplayName} & {partnerDisplayName}
               </Text>
               <Text style={[styles.cardBody, { color: colors.text_secondary, textAlign: 'center' }]}>
-                Since {new Date(link.pairedAt!).toLocaleDateString()}
+                Pair code {link.partnerCode} - connected {new Date(link.pairedAt!).toLocaleDateString()}
               </Text>
             </GlassCard>
 
-            <GlassCard style={styles.card}>
-              <View style={styles.scoreHeader}>
-                <Ionicons name="heart-circle" size={24} color={colors.accent_rose} />
-                <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Love Score</Text>
+            <View style={styles.dashboardGrid}>
+              <View style={[styles.metricPanel, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border }]}>
+                <Ionicons name="chatbubbles-outline" size={20} color={colors.accent_rose} />
+                <Text style={[styles.metricValue, { color: colors.text_primary }]}>
+                  {myResponse ? 'Shared' : 'Not shared'}
+                </Text>
+                <Text style={[styles.metricLabel, { color: colors.text_muted }]}>Your turn</Text>
               </View>
-              <View style={styles.scoreRow}>
-                <Text style={[styles.scoreValue, { color: colors.accent_rose }]}>{loveScore}</Text>
-                <Text style={[styles.scoreUnit, { color: colors.text_muted }]}>/ 100</Text>
+              <View style={[styles.metricPanel, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border }]}>
+                <Ionicons name="heart-circle" size={20} color={colors.accent_gold} />
+                <Text style={[styles.metricValue, { color: colors.text_primary }]}>
+                  {partnerResponse ? 'Replied' : 'No reply'}
+                </Text>
+                <Text style={[styles.metricLabel, { color: colors.text_muted }]}>Partner</Text>
               </View>
-              <View style={[styles.scoreBar, { backgroundColor: colors.glass_fill, borderColor: colors.glass_border }]}>
-                <LinearGradient
-                  colors={[colors.accent_rose, colors.accent_violet]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[styles.scoreFill, { width: `${loveScore}%` }]}
-                />
-              </View>
-              <Text style={[styles.scoreCopy, { color: colors.text_secondary }]}>{scoreCopy}</Text>
-            </GlassCard>
+            </View>
 
             <View style={styles.achievementRow}>
               {achievements.map((a) => (
@@ -349,13 +511,91 @@ export default function PartnerLiteScreen() {
             </View>
 
             <GlassCard style={styles.card}>
-              <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Today&apos;s shared prompt</Text>
+              <View style={styles.scoreHeader}>
+                <Ionicons name="sparkles-outline" size={22} color={colors.accent_rose} />
+                <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Today&apos;s exchange</Text>
+              </View>
               <Text style={[styles.promptText, { color: colors.text_primary }]}>
-                &quot;{todayPrompt.text}&quot;
+                &quot;{activePromptText}&quot;
               </Text>
-              <GradientButton label="Send to partner" onPress={handleSharePrompt} />
+              <TextInput
+                value={reflectionText}
+                onChangeText={setReflectionText}
+                placeholder="Write your reflection here..."
+                placeholderTextColor={colors.text_muted}
+                multiline
+                textAlignVertical="top"
+                style={[
+                  styles.reflectionInput,
+                  { backgroundColor: colors.glass_fill, borderColor: colors.glass_border, color: colors.text_primary },
+                ]}
+              />
+              <GradientButton
+                label={isSavingReflection ? 'Sharing...' : myResponse ? 'Update reflection' : 'Share in Partner Mode'}
+                onPress={handleSaveReflection}
+                disabled={isSavingReflection || reflectionText.trim().length === 0}
+              />
+
+              <View style={styles.exchangeColumns}>
+                <Text style={[styles.exchangeStatus, { color: colors.text_muted }]}>
+                  {responseKeys.length}/2 reflections loaded
+                </Text>
+                <View style={[styles.exchangePanel, { borderColor: colors.glass_border, backgroundColor: `${colors.accent_rose}0F` }]}>
+                  <Text style={[styles.exchangeLabel, { color: colors.accent_rose }]}>You</Text>
+                  <Text style={[styles.exchangeText, { color: myResponse ? colors.text_primary : colors.text_muted }]}>
+                    {myResponse || 'Write and share your reflection above.'}
+                  </Text>
+                </View>
+                <View style={[styles.exchangePanel, { borderColor: colors.glass_border, backgroundColor: `${colors.accent_violet}0F` }]}>
+                  <Text style={[styles.exchangeLabel, { color: colors.accent_violet }]}>Partner</Text>
+                  <Text style={[styles.exchangeText, { color: partnerResponse ? colors.text_primary : colors.text_muted }]}>
+                    {partnerResponse || 'No partner reflection shared yet.'}
+                  </Text>
+                </View>
+              </View>
+
+              <GhostButton label="Copy prompt externally" onPress={handleSharePrompt} />
               <GhostButton label="Browse more prompts" onPress={() => router.push('/(tabs)/daily' as any)} />
             </GlassCard>
+
+            {shares.length > 0 && (
+              <GlassCard style={styles.card}>
+                <View style={styles.scoreHeader}>
+                  <Ionicons name="gift-outline" size={22} color={colors.accent_gold} />
+                  <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Shared with you</Text>
+                </View>
+                {shares.map((s) => {
+                  const mine = account && s.senderUid === account.accountId;
+                  return (
+                    <View
+                      key={s.id}
+                      style={[
+                        styles.sharedItem,
+                        { borderColor: colors.glass_border, backgroundColor: `${mine ? colors.accent_rose : colors.accent_violet}0F` },
+                      ]}
+                    >
+                      <View style={styles.sharedHeader}>
+                        <Ionicons
+                          name={s.kind === 'creation' ? 'create-outline' : 'analytics-outline'}
+                          size={16}
+                          color={mine ? colors.accent_rose : colors.accent_violet}
+                        />
+                        <Text style={[styles.sharedFrom, { color: colors.text_muted }]} numberOfLines={1}>
+                          {mine ? 'You shared' : `${s.senderName ?? 'Partner'} shared`}
+                        </Text>
+                        {typeof s.score === 'number' && (
+                          <Text style={[styles.sharedScore, { color: colors.accent_gold }]}>{s.score}%</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.sharedTitle, { color: colors.text_primary }]}>{s.title}</Text>
+                      <Text style={[styles.sharedBody, { color: colors.text_secondary }]} numberOfLines={6}>
+                        {s.body}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </GlassCard>
+            )}
 
             <GhostButton label="Disconnect partner" onPress={handleDisconnect} style={styles.disconnect} />
           </>
@@ -373,6 +613,27 @@ const styles = StyleSheet.create({
   card: { padding: spacing.xl, gap: spacing.md, marginBottom: spacing.lg },
   cardTitle: { fontSize: fontSizes.lg, fontWeight: '600' },
   cardBody: { fontSize: fontSizes.sm, lineHeight: 20 },
+  segmented: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: 4,
+    gap: 4,
+    marginBottom: spacing.sm,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  segmentText: { fontSize: fontSizes.sm, fontWeight: '700' },
   codeBlock: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -392,8 +653,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   codeCharText: { fontSize: fontSizes.xl, fontWeight: '700', letterSpacing: 1 },
-  rowActions: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  flexBtn: { flex: 1 },
+  rowActions: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start', marginTop: spacing.md },
+  inviteActionBtn: { flex: 1, marginTop: 0 },
   input: {
     borderWidth: 1,
     borderRadius: radius.md,
@@ -407,6 +668,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 6,
   },
+  sharedItem: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  sharedHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  sharedFrom: { flex: 1, fontSize: fontSizes.xs, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: '600' },
+  sharedScore: { fontSize: fontSizes.sm, fontWeight: '700' },
+  sharedTitle: { fontSize: fontSizes.base, fontWeight: '600' },
+  sharedBody: { fontSize: fontSizes.sm, lineHeight: 20 },
   pairedBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pairedLabel: { fontSize: fontSizes.xs, fontWeight: '600', letterSpacing: 1.5, textTransform: 'uppercase' },
@@ -436,17 +709,43 @@ const styles = StyleSheet.create({
   },
   coupleName: { fontSize: fontSizes.lg, fontWeight: '700', textAlign: 'center', marginTop: spacing.xs },
   scoreHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-  scoreValue: { fontSize: 48, fontWeight: '800', letterSpacing: -1 },
-  scoreUnit: { fontSize: fontSizes.md, fontWeight: '600' },
-  scoreBar: {
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1,
-    overflow: 'hidden',
+  dashboardGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
-  scoreFill: { height: '100%', borderRadius: 4 },
-  scoreCopy: { fontSize: fontSizes.sm, fontStyle: 'italic' },
+  metricPanel: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
+  },
+  metricValue: { fontSize: fontSizes.md, fontWeight: '800' },
+  metricLabel: { fontSize: fontSizes.xs, fontWeight: '600' },
+  reflectionInput: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    fontSize: fontSizes.base,
+    lineHeight: 22,
+  },
+  exchangeColumns: {
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  exchangePanel: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  exchangeLabel: { fontSize: fontSizes.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  exchangeText: { fontSize: fontSizes.sm, lineHeight: 20 },
+  exchangeStatus: { fontSize: fontSizes.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   achievementRow: {
     flexDirection: 'row',
     gap: spacing.sm,

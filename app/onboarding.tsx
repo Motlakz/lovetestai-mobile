@@ -22,6 +22,16 @@ import GhostButton from '@/components/ui/GhostButton';
 import HeartParticles from '@/components/ui/HeartParticles';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useApp } from '@/context/AppContext';
+import { useAuthGate } from '@/components/auth/AuthGateModal';
+import { useAuthStore } from '@/store/authStore';
+import {
+  DEFAULT_NOTIF_PREFS,
+  NOTIF_FREQUENCY_OPTIONS,
+  NOTIF_TIME_PRESETS,
+  type NotifFrequency,
+  savePrefs as saveNotifPrefs,
+} from '@/services/notifications';
+import { useToast } from '@/components/ui/Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,10 +68,16 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     profileScrollContent: { flexGrow: 1, justifyContent: 'center' as const, paddingVertical: spacing.xl, paddingHorizontal: spacing.xs },
     ctaRow: { flexDirection: 'row' as const, gap: spacing.md, marginTop: spacing.lg },
     skipBtn: { alignSelf: 'center' as const, marginTop: spacing.md, borderWidth: 0 },
-    notifPreview: { padding: spacing.xl, marginBottom: spacing['2xl'], gap: spacing.sm },
+    notifPreview: { padding: spacing.xl, marginBottom: spacing.lg, gap: spacing.sm },
     notifTitle: { color: c.text_primary, fontSize: fontSizes.md, fontWeight: '600' as const },
     notifBody: { color: c.text_secondary, fontSize: fontSizes.sm },
     notifTime: { color: c.text_muted, fontSize: fontSizes.xs, textTransform: 'uppercase' as const, letterSpacing: 1 },
+    notifSectionLabel: { color: c.text_muted, fontSize: fontSizes.xs, letterSpacing: 1.5, textTransform: 'uppercase' as const, fontWeight: '600' as const, marginTop: spacing.md, marginBottom: spacing.sm },
+    chipRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, marginBottom: spacing.md },
+    chip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radius.full, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.glass_fill },
+    chipActive: { borderColor: c.accent_rose, backgroundColor: 'rgba(255,61,127,0.14)' },
+    chipText: { color: c.text_muted, fontSize: fontSizes.sm, fontWeight: '500' as const },
+    chipTextActive: { color: c.text_primary, fontWeight: '600' as const },
     dots: { flexDirection: 'row' as const, justifyContent: 'center' as const, gap: spacing.sm, paddingVertical: spacing.lg },
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.glass_border },
     dotActive: { backgroundColor: c.accent_rose, width: 24 },
@@ -74,17 +90,47 @@ export default function OnboardingScreen() {
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { completeOnboarding, updateProfile, profile } = useApp();
+  const signInAnonymously = useAuthStore((s) => s.signInAnonymously);
+  const { openSignIn } = useAuthGate();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [intent, setIntent] = useState('');
   const [name, setName] = useState('');
   const [dob, setDob] = useState('');
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [notifHour, setNotifHour] = useState(DEFAULT_NOTIF_PREFS.hour);
+  const [notifMinute, setNotifMinute] = useState(DEFAULT_NOTIF_PREFS.minute);
+  const [notifFrequency, setNotifFrequency] = useState<NotifFrequency>(DEFAULT_NOTIF_PREFS.frequency);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const toast = useToast();
 
   const finish = useCallback(() => {
     updateProfile({ ...profile, name, relationshipStatus: '', dateOfBirth: dob, intent });
     completeOnboarding();
     router.replace('/(tabs)/(home)');
   }, [completeOnboarding, dob, intent, name, profile, router, updateProfile]);
+
+  const finishAsGuest = useCallback(async () => {
+    setIsFinishing(true);
+    try {
+      await signInAnonymously();
+      finish();
+    } catch (e) {
+      console.log('Guest onboarding sign-in failed:', e);
+      finish();
+    } finally {
+      setIsFinishing(false);
+    }
+  }, [finish, signInAnonymously]);
+
+  const finishWithAccount = useCallback(async () => {
+    setIsFinishing(true);
+    try {
+      const ok = await openSignIn();
+      if (ok) finish();
+    } finally {
+      setIsFinishing(false);
+    }
+  }, [finish, openSignIn]);
 
   const goToSlide = useCallback((index: number) => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
@@ -94,13 +140,33 @@ export default function OnboardingScreen() {
   }, [fadeAnim]);
 
   const handleNext = useCallback(() => {
-    if (currentSlide < 3) goToSlide(currentSlide + 1);
+    if (currentSlide < 4) goToSlide(currentSlide + 1);
     else finish();
   }, [currentSlide, finish, goToSlide]);
 
-  const handleNotifications = useCallback(() => {
-    finish();
-  }, [finish]);
+  const handleAllowNotifications = useCallback(async () => {
+    try {
+      await saveNotifPrefs({
+        enabled: true,
+        hour: notifHour,
+        minute: notifMinute,
+        frequency: notifFrequency,
+      });
+      toast.success('Daily prompt reminder saved.');
+    } catch (e) {
+      console.log('Save notif prefs failed:', e);
+    }
+    goToSlide(4);
+  }, [goToSlide, notifHour, notifMinute, notifFrequency, toast]);
+
+  const handleSkipNotifications = useCallback(async () => {
+    try {
+      await saveNotifPrefs({ ...DEFAULT_NOTIF_PREFS, enabled: false });
+    } catch (e) {
+      console.log('Save notif prefs failed:', e);
+    }
+    goToSlide(4);
+  }, [goToSlide]);
 
   const renderWelcome = () => (
     <View style={styles.slideContainer}>
@@ -114,7 +180,6 @@ export default function OnboardingScreen() {
         <Text style={styles.descriptors}>LOVE LETTERS  ·  COMPATIBILITY  ·  DAILY PROMPTS</Text>
         <View style={styles.ctaGroup}>
           <GradientButton label="Get Started" onPress={handleNext} />
-          <GhostButton label="Continue as guest" onPress={finish} />
         </View>
       </View>
     </View>
@@ -163,25 +228,81 @@ export default function OnboardingScreen() {
     </KeyboardAvoidingView>
   );
 
-  const renderNotifPermission = () => (
+  const renderNotifPermission = () => {
+    const selectedTime = NOTIF_TIME_PRESETS.find((t) => t.hour === notifHour && t.minute === notifMinute);
+    const frequencyLabel = NOTIF_FREQUENCY_OPTIONS.find((f) => f.value === notifFrequency)?.label ?? 'Every day';
+    return (
+      <View style={styles.slideContainer}>
+        <ScrollView style={styles.profileScroll} contentContainerStyle={styles.profileScrollContent} showsVerticalScrollIndicator={false}>
+          <Text style={styles.slideTitle}>Stay inspired</Text>
+          <Text style={styles.slideSubtitle}>Pick when a private prompt should land in the app.</Text>
+          <GlassCard style={styles.notifPreview}>
+            <Text style={styles.notifTitle}>Today{"'"}s prompt is ready</Text>
+            <Text style={styles.notifBody}>What is one small thing you appreciate about love today?</Text>
+            <Text style={styles.notifTime}>{frequencyLabel} · {selectedTime?.label ?? `${String(notifHour).padStart(2, '0')}:${String(notifMinute).padStart(2, '0')}`}</Text>
+          </GlassCard>
+
+          <Text style={styles.notifSectionLabel}>Preferred time</Text>
+          <View style={styles.chipRow}>
+            {NOTIF_TIME_PRESETS.map((t) => {
+              const active = t.hour === notifHour && t.minute === notifMinute;
+              return (
+                <TouchableOpacity
+                  key={t.label}
+                  onPress={() => { setNotifHour(t.hour); setNotifMinute(t.minute); }}
+                  style={[styles.chip, active && styles.chipActive]}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.notifSectionLabel}>How often</Text>
+          <View style={styles.chipRow}>
+            {NOTIF_FREQUENCY_OPTIONS.map((f) => {
+              const active = f.value === notifFrequency;
+              return (
+                <TouchableOpacity
+                  key={f.value}
+                  onPress={() => setNotifFrequency(f.value)}
+                  style={[styles.chip, active && styles.chipActive]}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.ctaGroup}>
+            <GradientButton label="Turn on prompts" onPress={handleAllowNotifications} />
+            <GhostButton label="Not now" onPress={handleSkipNotifications} />
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderAccountChoice = () => (
     <View style={styles.slideContainer}>
       <View style={styles.slideContent}>
-        <Text style={styles.slideTitle}>Stay inspired daily</Text>
-        <Text style={styles.slideSubtitle}>Get a fresh private prompt every morning</Text>
-        <GlassCard style={styles.notifPreview}>
-          <Text style={styles.notifTitle}>Today{"'"}s prompt is ready</Text>
-          <Text style={styles.notifBody}>What is one small thing you appreciate about love today?</Text>
-          <Text style={styles.notifTime}>Daily · 9:00 AM</Text>
-        </GlassCard>
+        <Text style={styles.slideTitle}>Choose how to continue</Text>
+        <Text style={styles.slideSubtitle}>Guest mode creates a private device identity. Creating an account uses Google.</Text>
         <View style={styles.ctaGroup}>
-          <GradientButton label="Allow Notifications" onPress={handleNotifications} />
-          <GhostButton label="Not now" onPress={finish} />
+          <GradientButton
+            label={isFinishing ? 'Continuing...' : 'Continue as guest'}
+            onPress={finishAsGuest}
+            disabled={isFinishing}
+          />
+          <GhostButton label="Create account" onPress={finishWithAccount} />
         </View>
       </View>
     </View>
   );
 
-  const slides = [renderWelcome, renderIntent, renderProfileSetup, renderNotifPermission];
+  const slides = [renderWelcome, renderIntent, renderProfileSetup, renderNotifPermission, renderAccountChoice];
 
   return (
     <ScreenBackground>

@@ -2,20 +2,30 @@ import { create } from 'zustand';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
+  signInAnonymously as fbSignInAnonymously,
   signInWithCredential,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
 import { auth as firebaseAuth } from '@/services/firebase';
-import { AuthAccount, loadAuthAccount, persistAuthAccount } from '@/services/db';
+import { AuthAccount, getOrCreateDeviceId, loadAuthAccount, persistAuthAccount } from '@/services/db';
 
 interface AuthState {
   isLoading: boolean;
   account: AuthAccount | null;
   init: () => Promise<void>;
+  signInAnonymously: () => Promise<AuthAccount>;
   signInWithGoogle: () => Promise<AuthAccount>;
   signInWithGoogleIdToken: (idToken: string, accessToken?: string) => Promise<AuthAccount>;
   signOut: () => Promise<void>;
+}
+
+let cachedDeviceId: string | null = null;
+
+async function ensureDeviceId(): Promise<string> {
+  if (cachedDeviceId) return cachedDeviceId;
+  cachedDeviceId = await getOrCreateDeviceId();
+  return cachedDeviceId;
 }
 
 function userToAccount(user: User): AuthAccount {
@@ -24,12 +34,14 @@ function userToAccount(user: User): AuthAccount {
     email: user.email ?? '',
     displayName: user.displayName,
     photoURL: user.photoURL,
-    provider: 'google',
+    provider: user.isAnonymous ? 'anonymous' : 'google',
     createdAt: user.metadata.creationTime ?? new Date().toISOString(),
+    deviceId: cachedDeviceId ?? undefined,
   };
 }
 
 let authSubscribed = false;
+let authInitPromise: Promise<void> | null = null;
 
 type GoogleSigninModule = {
   GoogleSignin: {
@@ -76,30 +88,71 @@ export const useAuthStore = create<AuthState>((set) => ({
   account: null,
 
   init: async () => {
+    if (authInitPromise) return authInitPromise;
+    authInitPromise = (async () => {
     try {
-      const stored = await loadAuthAccount();
-      set({ account: stored, isLoading: false });
+      await ensureDeviceId();
 
-      if (firebaseAuth && !authSubscribed) {
-        authSubscribed = true;
-        onAuthStateChanged(firebaseAuth, async (user) => {
+      if (firebaseAuth) {
+        const auth = firebaseAuth;
+        await new Promise<void>((resolve) => {
+          const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            unsubscribe();
+            if (!authSubscribed) {
+              authSubscribed = true;
+              onAuthStateChanged(auth, async (nextUser) => {
+                if (nextUser) {
+                  const account = userToAccount(nextUser);
+                  await persistAuthAccount(account);
+                  set({ account });
+                } else {
+                  await persistAuthAccount(null);
+                  set({ account: null });
+                }
+              });
+            }
+
           if (user) {
             const account = userToAccount(user);
             await persistAuthAccount(account);
-            set({ account });
+            set({ account, isLoading: false });
           } else {
-            const current = await loadAuthAccount();
-            if (current?.provider === 'google') {
+            try {
+              const cred = await fbSignInAnonymously(auth);
+              await cred.user.getIdToken(true);
+              const account = userToAccount(cred.user);
+              await persistAuthAccount(account);
+              set({ account, isLoading: false });
+            } catch (signInError) {
+              console.log('Auto guest sign-in failed:', signInError);
               await persistAuthAccount(null);
-              set({ account: null });
+              set({ account: null, isLoading: false });
             }
           }
+            resolve();
+          });
         });
+        return;
       }
+
+      const stored = await loadAuthAccount();
+      set({ account: stored, isLoading: false });
     } catch (e) {
       console.log('Auth init failed:', e);
       set({ isLoading: false });
     }
+    })();
+    return authInitPromise;
+  },
+
+  signInAnonymously: async () => {
+    if (!firebaseAuth) throw new Error('Firebase not configured');
+    const userCred = await fbSignInAnonymously(firebaseAuth);
+    await userCred.user.getIdToken(true);
+    const account = userToAccount(userCred.user);
+    await persistAuthAccount(account);
+    set({ account });
+    return account;
   },
 
   signInWithGoogle: async () => {
@@ -128,6 +181,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       const credential = GoogleAuthProvider.credential(idToken);
       const userCred = await signInWithCredential(firebaseAuth, credential);
+      await userCred.user.getIdToken(true);
       const account = userToAccount(userCred.user);
       await persistAuthAccount(account);
       set({ account });
@@ -150,6 +204,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (!firebaseAuth) throw new Error('Firebase not configured');
     const credential = GoogleAuthProvider.credential(idToken, accessToken);
     const userCred = await signInWithCredential(firebaseAuth, credential);
+    await userCred.user.getIdToken(true);
     const account = userToAccount(userCred.user);
     await persistAuthAccount(account);
     set({ account });
