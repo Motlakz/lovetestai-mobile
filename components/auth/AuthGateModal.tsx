@@ -68,6 +68,7 @@ export function AuthGateProvider({ children }: { children: React.ReactNode }) {
 function AuthGateSheet({ request, onClose }: { request: GateRequest; onClose: (success: boolean) => void }) {
   const { colors } = useTheme();
   const toast = useToast();
+  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const signInWithGoogleIdToken = useAuthStore((s) => s.signInWithGoogleIdToken);
   const [busy, setBusy] = useState(false);
 
@@ -121,8 +122,27 @@ function AuthGateSheet({ request, onClose }: { request: GateRequest; onClose: (s
       toast.error('Firebase is not configured.');
       return;
     }
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setBusy(true);
+      try {
+        await signInWithGoogle();
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        toast.success('Signed in with Google.');
+        onClose(true);
+      } catch (e: any) {
+        console.log('Native Google sign-in failed:', e);
+        if (e?.message === 'Sign-in cancelled') {
+          return;
+        }
+        toast.error(e?.message || 'Sign-in failed. Try again.');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (!platformClientId) {
-      toast.error(`${Platform.OS === 'android' ? 'Android' : Platform.OS === 'ios' ? 'iOS' : 'Web'} Google client ID is missing.`);
+      toast.error('Web Google client ID is missing.');
       return;
     }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,7 +154,7 @@ function AuthGateSheet({ request, onClose }: { request: GateRequest; onClose: (s
       toast.error('Could not open Google sign-in.');
       setBusy(false);
     }
-  }, [promptAsync, toast, platformClientId]);
+  }, [promptAsync, toast, platformClientId, signInWithGoogle, onClose]);
 
   const handleCancel = useCallback(() => {
     onClose(false);

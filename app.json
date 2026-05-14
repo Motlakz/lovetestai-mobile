@@ -46,6 +46,7 @@
           "savePhotosPermission": "Allow Love Test AI to save your exported creation cards to your photo library."
         }
       ],
+      "@react-native-google-signin/google-signin",
       "expo-web-browser",
       "expo-sqlite"
     ],

@@ -13,6 +13,7 @@ interface AuthState {
   isLoading: boolean;
   account: AuthAccount | null;
   init: () => Promise<void>;
+  signInWithGoogle: () => Promise<AuthAccount>;
   signInWithGoogleIdToken: (idToken: string, accessToken?: string) => Promise<AuthAccount>;
   signOut: () => Promise<void>;
 }
@@ -29,6 +30,46 @@ function userToAccount(user: User): AuthAccount {
 }
 
 let authSubscribed = false;
+
+type GoogleSigninModule = {
+  GoogleSignin: {
+    configure: (config: { webClientId?: string; offlineAccess?: boolean }) => Promise<void> | void;
+    hasPlayServices: (config?: { showPlayServicesUpdateDialog?: boolean }) => Promise<boolean>;
+    signIn: () => Promise<{
+      idToken?: string;
+      data?: { idToken?: string };
+    }>;
+  };
+  statusCodes?: {
+    SIGN_IN_CANCELLED: string;
+    IN_PROGRESS: string;
+    PLAY_SERVICES_NOT_AVAILABLE: string;
+  };
+};
+
+let googleSigninModulePromise: Promise<GoogleSigninModule | null> | null = null;
+
+const getGoogleSigninModule = async (): Promise<GoogleSigninModule | null> => {
+  if (!googleSigninModulePromise) {
+    googleSigninModulePromise = (async () => {
+      try {
+        const module = await import('@react-native-google-signin/google-signin');
+        if (!module.GoogleSignin) {
+          return null;
+        }
+        return {
+          GoogleSignin: module.GoogleSignin,
+          statusCodes: module.statusCodes,
+        } as GoogleSigninModule;
+      } catch (error) {
+        console.warn('Google Sign-In native module unavailable. Use a development build instead of Expo Go.', error);
+        return null;
+      }
+    })();
+  }
+
+  return googleSigninModulePromise;
+};
 
 export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
@@ -58,6 +99,50 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (e) {
       console.log('Auth init failed:', e);
       set({ isLoading: false });
+    }
+  },
+
+  signInWithGoogle: async () => {
+    if (!firebaseAuth) throw new Error('Firebase not configured');
+
+    const googleSigninModule = await getGoogleSigninModule();
+    if (!googleSigninModule) {
+      throw new Error('Google Sign-In requires a development build.');
+    }
+
+    const { GoogleSignin, statusCodes } = googleSigninModule;
+
+    try {
+      await GoogleSignin.configure({
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+        offlineAccess: false,
+      });
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken ?? userInfo.idToken;
+
+      if (!idToken) {
+        throw new Error('No ID token received from Google');
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCred = await signInWithCredential(firebaseAuth, credential);
+      const account = userToAccount(userCred.user);
+      await persistAuthAccount(account);
+      set({ account });
+      return account;
+    } catch (error: any) {
+      if (statusCodes && error?.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new Error('Sign-in cancelled');
+      }
+      if (statusCodes && error?.code === statusCodes.IN_PROGRESS) {
+        throw new Error('Sign-in already in progress');
+      }
+      if (statusCodes && error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new Error('Google Play Services not available');
+      }
+      throw error;
     }
   },
 
