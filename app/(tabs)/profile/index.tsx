@@ -304,6 +304,7 @@ function createStyles(c: ThemeColors) {
       borderColor: c.glass_border,
       paddingVertical: spacing.xl,
       paddingHorizontal: spacing.xl,
+      overflow: 'hidden' as const,
     },
     detailHeader: {
       flexDirection: 'row' as const,
@@ -322,13 +323,15 @@ function createStyles(c: ThemeColors) {
     detailType: { color: c.accent_rose, fontSize: fontSizes.xs, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 1 },
     detailMeta: { color: c.text_muted, fontSize: fontSizes.xs, marginTop: 2 },
     detailScroll: {
-      maxHeight: 360,
+      flexShrink: 1,
       borderRadius: radius.md,
       borderWidth: 1,
       borderColor: c.glass_border,
       backgroundColor: c.glass_fill,
-      padding: spacing.lg,
       marginBottom: spacing.lg,
+    },
+    detailScrollContent: {
+      padding: spacing.lg,
     },
     detailBody: { color: c.text_primary, fontSize: fontSizes.base, lineHeight: 24 },
     detailActions: { flexDirection: 'row' as const, gap: spacing.sm, flexWrap: 'wrap' as const },
@@ -645,11 +648,21 @@ export default function ProfileScreen() {
   }, [openManualFeedback]);
 
   const handlePrivacyPolicy = useCallback(() => {
-    Linking.openURL('https://lovetestai.com/privacy').catch(() => {
+    Linking.openURL('https://lovetestai.com/privacy-policy').catch(() => {
       alert({
         title: 'Privacy Policy',
-        message: 'Our privacy policy ensures your data stays private and secure. We do not share your personal information with third parties. All AI-generated content is processed securely and not stored on our servers.',
+        message: 'Could not open the privacy policy. Visit lovetestai.com/privacy-policy from any browser.',
         icon: 'shield-checkmark-outline',
+      });
+    });
+  }, [alert]);
+
+  const handleTermsOfService = useCallback(() => {
+    Linking.openURL('https://lovetestai.com/terms-of-service').catch(() => {
+      alert({
+        title: 'Terms of Service',
+        message: 'Could not open the terms of service. Visit lovetestai.com/terms-of-service from any browser.',
+        icon: 'document-text-outline',
       });
     });
   }, [alert]);
@@ -870,6 +883,7 @@ export default function ProfileScreen() {
           {renderSettingsRow('language-outline', 'Language', handleLanguage, 'Soon')}
           {renderSettingsRow('star-outline', 'Rate Love Test AI', handleRateApp)}
           {renderSettingsRow('shield-outline', 'Privacy Policy', handlePrivacyPolicy)}
+          {renderSettingsRow('document-text-outline', 'Terms of Service', handleTermsOfService)}
           {account
             ? renderSettingsRow('log-out-outline', 'Sign Out of Account', handleSignOutAccount, undefined, true)
             : renderSettingsRow('person-circle-outline', 'Start demo or sign in', handleSignIn)}
@@ -1113,7 +1127,12 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               </View>
-              <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.detailScroll}
+                contentContainerStyle={styles.detailScrollContent}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+              >
                 <Text style={styles.detailBody}>{viewingCreation.content}</Text>
               </ScrollView>
               <View style={styles.detailActions}>

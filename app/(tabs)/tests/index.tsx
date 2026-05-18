@@ -63,12 +63,15 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     featuredTitle: { fontSize: fontSizes.xl, color: c.text_primary, fontWeight: '700' as const },
     featuredDetail: { fontSize: fontSizes.sm, color: c.text_secondary },
     featuredCta: { alignSelf: 'flex-start' as const, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
-    testRow: { padding: spacing.lg, paddingHorizontal: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md, marginBottom: spacing.md, minHeight: 84 },
-    testIconGradient: { width: 52, height: 52, borderRadius: 16, alignItems: 'center' as const, justifyContent: 'center' as const },
-    testInfo: { flex: 1, gap: 4 },
-    testTitle: { fontSize: fontSizes.md, color: c.text_primary, fontWeight: '600' as const },
-    testDesc: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 18 },
-    testRight: { alignItems: 'flex-end' as const, gap: spacing.xs },
+    testCard: { padding: 0, flexDirection: 'row' as const, alignItems: 'stretch' as const, marginBottom: spacing.md, minHeight: 124, overflow: 'hidden' as const },
+    testCardStrip: { width: 68, alignItems: 'center' as const, justifyContent: 'center' as const, gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: 4 },
+    testStripDuration: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' as const, letterSpacing: 1 },
+    testCardBody: { flex: 1, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.xs, justifyContent: 'space-between' as const },
+    testCardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: spacing.sm },
+    testCardTitle: { fontSize: fontSizes.md, color: c.text_primary, fontWeight: '700' as const, flex: 1 },
+    testCardDesc: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 18 },
+    testCardCta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, alignSelf: 'flex-end' as const, marginTop: spacing.xs },
+    testCardCtaText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 0.8, textTransform: 'uppercase' as const },
     difficultyDots: { flexDirection: 'row' as const, gap: 3 },
     difficultyDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: c.glass_border },
     completedBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
@@ -372,6 +375,18 @@ export default function TestsScreen() {
       if (error?.message !== 'User did not share') console.log('Share error:', error);
     }
   }, [llResult, toast]);
+
+  const getTestTheme = useCallback((type: string): { gradient: readonly [string, string, ...string[]]; accent: string } => {
+    switch (type) {
+      case 'zodiac':     return { gradient: ['#6366f1', '#8b5cf6'] as const, accent: '#818cf8' };
+      case 'birthdate':  return { gradient: ['#22c55e', '#14b8a6'] as const, accent: '#22c55e' };
+      case 'love-score': return { gradient: ['#f472b6', '#e8516a'] as const, accent: '#f472b6' };
+      case 'numerology': return { gradient: ['#facc15', '#1d4ed8'] as const, accent: '#facc15' };
+      case 'soulmate':   return { gradient: ['#fb7185', '#dc2626'] as const, accent: '#fb7185' };
+      case 'love-quiz':  return { gradient: ['#8b5cf6', '#ec4899', '#a855f7'] as const, accent: '#a855f7' };
+      default:           return { gradient: ['#f472b6', '#e8516a'] as const, accent: '#f472b6' };
+    }
+  }, []);
 
   const renderDifficultyDots = useCallback((duration: string) => {
     const level = DIFFICULTY_MAP[duration] || 1;
@@ -732,23 +747,30 @@ export default function TestsScreen() {
             </GlassCard>
           </TouchableOpacity>
 
-          {calcTests.map((test) => (
-            <TouchableOpacity key={test.id} onPress={() => startCalculator(test)} activeOpacity={0.8}>
-              <GlassCard style={styles.testRow}>
-                <LinearGradient colors={[colors.grad_violet_start, colors.grad_rose_end]} style={styles.testIconGradient}>
-                  <Ionicons name={test.icon as any} size={24} color={colors.text_on_grad} />
-                </LinearGradient>
-                <View style={styles.testInfo}>
-                  <Text style={styles.testTitle}>{test.title}</Text>
-                  <Text style={styles.testDesc}>{test.description}</Text>
-                </View>
-                <View style={styles.testRight}>
-                  <GoldBadge label={test.duration} />
-                  {renderDifficultyDots(test.duration)}
-                </View>
-              </GlassCard>
-            </TouchableOpacity>
-          ))}
+          {calcTests.map((test) => {
+            const theme = getTestTheme(test.calculatorType);
+            return (
+              <TouchableOpacity key={test.id} onPress={() => startCalculator(test)} activeOpacity={0.9}>
+                <GlassCard style={styles.testCard}>
+                  <LinearGradient colors={theme.gradient} style={styles.testCardStrip} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}>
+                    <Ionicons name={test.icon as any} size={26} color="#FFFFFF" />
+                    <Text style={styles.testStripDuration}>{test.duration.toUpperCase()}</Text>
+                  </LinearGradient>
+                  <View style={styles.testCardBody}>
+                    <View style={styles.testCardHeader}>
+                      <Text style={styles.testCardTitle} numberOfLines={1}>{test.title}</Text>
+                      {renderDifficultyDots(test.duration)}
+                    </View>
+                    <Text style={styles.testCardDesc} numberOfLines={2}>{test.description}</Text>
+                    <View style={styles.testCardCta}>
+                      <Text style={[styles.testCardCtaText, { color: theme.accent }]}>Start test</Text>
+                      <Ionicons name="arrow-forward" size={14} color={theme.accent} />
+                    </View>
+                  </View>
+                </GlassCard>
+              </TouchableOpacity>
+            );
+          })}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>

@@ -143,8 +143,9 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     resultCard: { padding: spacing.xl },
     resultText: { color: c.text_primary, fontSize: fontSizes.base, lineHeight: 26 },
     resultActions: { marginTop: spacing.md, gap: spacing.sm },
-    resultActionsRow: { flexDirection: 'row' as const, gap: spacing.sm },
+    resultActionsRow: { flexDirection: 'row' as const, gap: spacing.sm, justifyContent: 'center' as const },
     resultActionSlot: { flex: 1 },
+    resultIconBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: c.glass_border, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: c.glass_fill },
     bottomSpacer: { height: 40 },
     exportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' as const },
     exportSheet: { backgroundColor: c.bg_surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: c.glass_border, borderBottomWidth: 0, height: '100%' as const },
@@ -513,9 +514,15 @@ export default function CreateModeScreen() {
                   <GoldDivider />
                   <View style={styles.resultActions}>
                     <View style={styles.resultActionsRow}>
-                      <GhostButton label="Regenerate" onPress={handleRegenerate} small style={styles.resultActionSlot} />
-                      <GhostButton label="Copy" onPress={handleCopy} small style={styles.resultActionSlot} />
-                      <GhostButton label="Save" onPress={handleSave} small style={styles.resultActionSlot} />
+                      <TouchableOpacity onPress={handleRegenerate} style={styles.resultIconBtn} accessibilityLabel="Regenerate" activeOpacity={0.7}>
+                        <Ionicons name="refresh" size={20} color={colors.text_secondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleCopy} style={styles.resultIconBtn} accessibilityLabel="Copy" activeOpacity={0.7}>
+                        <Ionicons name="copy-outline" size={20} color={colors.text_secondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleSave} style={styles.resultIconBtn} accessibilityLabel="Save" activeOpacity={0.7}>
+                        <Ionicons name="bookmark-outline" size={20} color={colors.text_secondary} />
+                      </TouchableOpacity>
                     </View>
                     <GradientButton label="Export" onPress={() => setShowExportSheet(true)} small noTopMargin />
                   </View>

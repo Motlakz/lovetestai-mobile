@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,6 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import { useApp } from '@/context/AppContext';
 import { useInboxStore, unreadCount } from '@/store/inboxStore';
 import InboxModal from '@/components/ui/InboxModal';
-import { useState } from 'react';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - spacing.xl * 2 - spacing.md) / 2;
@@ -127,7 +126,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.greetingSection}>
-            <Text style={styles.greetingSub}>Write a letter to your loved one, test your compatibility, or find some love prompts.</Text>
+            <Text style={styles.greetingSub}>Write to your loved one, test your compatibility, or find some love prompts.</Text>
           </View>
 
           <SectionTitle title="Create Something Beautiful" />
@@ -163,7 +162,7 @@ export default function HomeScreen() {
             <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/tests' as any); }} activeOpacity={0.8}>
               <GlassCard style={styles.quickAction}>
                 <Ionicons name="heart-outline" size={18} color={colors.accent_rose} />
-                <Text style={styles.quickActionLabel}>Take a Test</Text>
+                <Text style={styles.quickActionLabel}>Take Love Test</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.text_muted} />
               </GlassCard>
             </TouchableOpacity>
