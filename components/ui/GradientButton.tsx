@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Animated, ViewStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Animated, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import { radius, fontSizes, spacing } from '@/constants/theme';
@@ -7,7 +7,7 @@ import { radius, fontSizes, spacing } from '@/constants/theme';
 interface GradientButtonProps {
   label: string;
   onPress: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   disabled?: boolean;
   small?: boolean;
   icon?: React.ReactNode;
@@ -55,7 +55,7 @@ export default function GradientButton({ label, onPress, style, disabled, small,
           ]}
         >
           {icon && icon}
-          <Text style={[styles.label, { color: colors.text_on_grad }]}>{label}</Text>
+          <Text style={[styles.label, small && styles.labelSmall, { color: colors.text_on_grad }]}>{label}</Text>
         </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
@@ -84,6 +84,9 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     fontWeight: '700' as const,
     letterSpacing: 0.3,
+  },
+  labelSmall: {
+    fontSize: fontSizes.sm,
   },
   disabled: {
     opacity: 0.5,

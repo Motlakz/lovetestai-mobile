@@ -54,6 +54,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
 import { useFeedbackStore } from '@/store/feedbackStore';
 import { useAuthStore } from '@/store/authStore';
+import { useInboxStore } from '@/store/inboxStore';
 import { usePartnerStore } from '@/store/partnerStore';
 import { sharePartnerItem } from '@/services/partnerExchange';
 import {
@@ -141,7 +142,9 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     resultContainer: { marginTop: spacing.md },
     resultCard: { padding: spacing.xl },
     resultText: { color: c.text_primary, fontSize: fontSizes.base, lineHeight: 26 },
-    resultActions: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm, justifyContent: 'center' as const },
+    resultActions: { marginTop: spacing.md, gap: spacing.sm },
+    resultActionsRow: { flexDirection: 'row' as const, gap: spacing.sm },
+    resultActionSlot: { flex: 1 },
     bottomSpacer: { height: 40 },
     exportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' as const },
     exportSheet: { backgroundColor: c.bg_surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: c.glass_border, borderBottomWidth: 0, height: '100%' as const },
@@ -253,6 +256,11 @@ export default function CreateModeScreen() {
       setResult(content);
       setShowResult(true);
       void recordFeedbackUse(`generator:${selectedTool}`);
+      void useInboxStore.getState().push({
+        kind: 'creation_generated',
+        title: `${meta.title} generated`,
+        body: toName ? `A new ${meta.title.toLowerCase()} for ${toName} is ready.` : `Your new ${meta.title.toLowerCase()} is ready.`,
+      });
       Animated.spring(resultAnim, { toValue: 1, useNativeDriver: true, damping: 15 }).start();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 300);
@@ -262,7 +270,7 @@ export default function CreateModeScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast, recordFeedbackUse]);
+  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast, recordFeedbackUse, meta.title]);
 
   const handleCopy = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -278,6 +286,12 @@ export default function CreateModeScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     saveCreation({ id: Date.now().toString(), type: meta.title, content: result, toName, createdAt: new Date().toISOString() });
     toast.success('Saved to your profile.');
+    void useInboxStore.getState().push({
+      kind: 'creation_saved',
+      title: `${meta.title} saved`,
+      body: toName ? `Saved your ${meta.title.toLowerCase()} for ${toName} to your profile.` : `Saved your ${meta.title.toLowerCase()} to your profile.`,
+      route: '/(tabs)/profile',
+    });
   }, [result, meta.title, toName, saveCreation, toast]);
 
   const handleRegenerate = useCallback(() => {
@@ -498,10 +512,12 @@ export default function CreateModeScreen() {
                   <Text style={styles.resultText}>{result}</Text>
                   <GoldDivider />
                   <View style={styles.resultActions}>
-                    <GhostButton label="Regenerate" onPress={handleRegenerate} />
-                    <GhostButton label="Copy" onPress={handleCopy} />
-                    <GhostButton label="Save" onPress={handleSave} />
-                    <GradientButton label="Export" onPress={() => setShowExportSheet(true)} small />
+                    <View style={styles.resultActionsRow}>
+                      <GhostButton label="Regenerate" onPress={handleRegenerate} small style={styles.resultActionSlot} />
+                      <GhostButton label="Copy" onPress={handleCopy} small style={styles.resultActionSlot} />
+                      <GhostButton label="Save" onPress={handleSave} small style={styles.resultActionSlot} />
+                    </View>
+                    <GradientButton label="Export" onPress={() => setShowExportSheet(true)} small noTopMargin />
                   </View>
                 </GlassCard>
               </Animated.View>

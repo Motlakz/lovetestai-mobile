@@ -70,7 +70,7 @@ export default function DrawerMenu({ visible, onClose, onOpenFeedback }: DrawerM
     { id: 'home', icon: 'home-outline', label: 'Home', route: '/(tabs)/(home)', section: 'main' },
     { id: 'tests', icon: 'heart-outline', label: 'Tests', route: '/(tabs)/tests', section: 'main' },
     { id: 'daily', icon: 'calendar-outline', label: 'Daily Prompts', route: '/(tabs)/daily', section: 'main' },
-    { id: 'partner', icon: 'happy-outline', label: 'Two-Player Prompts', route: '/(tabs)/partner', section: 'features' },
+    { id: 'partner', icon: 'happy-outline', label: 'Partner Prompts', route: '/(tabs)/partner', section: 'features' },
     { id: 'feedback', icon: 'star-outline', label: 'Rate Experience', action: () => { onClose(); setTimeout(onOpenFeedback, 300); }, section: 'features' },
     { id: 'profile', icon: 'person-outline', label: 'My Profile', route: '/(tabs)/profile', section: 'account' },
   ];

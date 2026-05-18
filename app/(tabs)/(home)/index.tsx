@@ -20,6 +20,9 @@ import GlassCard from '@/components/ui/GlassCard';
 import GoldBadge from '@/components/ui/GoldBadge';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { useApp } from '@/context/AppContext';
+import { useInboxStore, unreadCount } from '@/store/inboxStore';
+import InboxModal from '@/components/ui/InboxModal';
+import { useState } from 'react';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - spacing.xl * 2 - spacing.md) / 2;
@@ -38,9 +41,13 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
   return StyleSheet.create({
     container: { flex: 1 },
     scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
-    greetingSection: { paddingVertical: spacing.lg },
-    greeting: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const },
-    greetingSub: { fontSize: fontSizes.sm, color: c.text_secondary, marginTop: spacing.xs },
+    headerRow: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const, paddingTop: spacing.md, gap: spacing.md },
+    headerGreeting: { flex: 1, fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, flexWrap: 'wrap' as const, lineHeight: fontSizes['2xl'] * 1.2 },
+    headerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.glass_fill, position: 'relative' as const },
+    headerBadge: { position: 'absolute' as const, top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.accent_rose, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 2, borderColor: c.bg_deep },
+    headerBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' as const, lineHeight: 12 },
+    greetingSection: { paddingTop: spacing.md, paddingBottom: spacing.lg },
+    greetingSub: { fontSize: fontSizes.sm, color: c.text_secondary },
     cardGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.md, marginBottom: spacing.xl },
     featureCard: { width: CARD_WIDTH, overflow: 'hidden' as const, position: 'relative' as const },
     featureCardInner: { padding: spacing.lg, gap: spacing.sm, minHeight: 150 },
@@ -66,6 +73,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { profile } = useApp();
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const unread = useInboxStore(s => unreadCount(s.items));
 
   const FEATURES: FeatureCard[] = useMemo(() => [
     { id: 'love-letter', icon: 'mail-outline', label: 'Love Letter', description: 'Write a heartfelt, personal letter', gradient: [colors.grad_rose_start, colors.grad_rose_end], route: '/create-mode?tool=love-letter' },
@@ -100,8 +109,24 @@ export default function HomeScreen() {
     <ScreenBackground>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerGreeting}>
+              {greeting}{profile.name ? `, ${profile.name}` : ''}
+            </Text>
+            <TouchableOpacity
+              onPress={() => { void Haptics.selectionAsync(); setInboxOpen(true); }}
+              style={styles.headerIconBtn}
+              accessibilityLabel="Notifications"
+            >
+              <Ionicons name="notifications-outline" size={20} color={colors.text_secondary} />
+              {unread > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
           <View style={styles.greetingSection}>
-            <Text style={styles.greeting}>{greeting}{profile.name ? `, ${profile.name}` : ''}</Text>
             <Text style={styles.greetingSub}>Write a letter to your loved one, test your compatibility, or find some love prompts.</Text>
           </View>
 
@@ -164,7 +189,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1, gap: spacing.xs }}>
                   <View style={{ flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm }}>
                     <Ionicons name="happy-outline" size={22} color={colors.accent_rose} />
-                    <Text style={styles.partnerTitle}>Two-Player Prompts</Text>
+                    <Text style={styles.partnerTitle}>Partner Prompts</Text>
                   </View>
                   <Text style={styles.partnerDesc}>Send a prompt to someone and compare reflections together.</Text>
                 </View>
@@ -176,6 +201,7 @@ export default function HomeScreen() {
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </View>
+      <InboxModal visible={inboxOpen} onClose={() => setInboxOpen(false)} />
     </ScreenBackground>
   );
 }

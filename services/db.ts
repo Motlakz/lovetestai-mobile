@@ -89,9 +89,20 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
           text TEXT NOT NULL,
           saved_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS inbox (
+          id TEXT PRIMARY KEY NOT NULL,
+          kind TEXT NOT NULL,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          icon TEXT,
+          route TEXT,
+          read INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS idx_creations_created_at ON creations(created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_journal_date ON journal(date DESC);
         CREATE INDEX IF NOT EXISTS idx_prompts_saved_at ON prompts(saved_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_inbox_created_at ON inbox(created_at DESC);
       `);
       await migrateFromAsyncStorage(db);
       return db;
@@ -388,6 +399,99 @@ export async function insertPrompt(p: SavedPrompt): Promise<void> {
   await setSetting('saved_prompts', [p, ...cur]);
 }
 
+export type InboxKind =
+  | 'daily_prompt'
+  | 'creation_saved'
+  | 'creation_generated'
+  | 'partner_paired'
+  | 'partner_prompt'
+  | 'partner_reflection'
+  | 'partner_response'
+  | 'system';
+
+export interface InboxItem {
+  id: string;
+  kind: InboxKind;
+  title: string;
+  body: string;
+  icon?: string | null;
+  route?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export async function listInbox(): Promise<InboxItem[]> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    const rows = await db.getAllAsync<{ id: string; kind: string; title: string; body: string; icon: string | null; route: string | null; read: number; created_at: string }>(
+      'SELECT id, kind, title, body, icon, route, read, created_at FROM inbox ORDER BY created_at DESC',
+    );
+    return rows.map(r => ({
+      id: r.id,
+      kind: r.kind as InboxKind,
+      title: r.title,
+      body: r.body,
+      icon: r.icon ?? undefined,
+      route: r.route ?? undefined,
+      read: r.read !== 0,
+      createdAt: r.created_at,
+    }));
+  }
+  return (await getSetting<InboxItem[]>('inbox_items')) ?? [];
+}
+
+export async function insertInbox(item: InboxItem): Promise<void> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    await db.runAsync(
+      'INSERT OR REPLACE INTO inbox (id, kind, title, body, icon, route, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      item.id, item.kind, item.title, item.body, item.icon ?? null, item.route ?? null, item.read ? 1 : 0, item.createdAt,
+    );
+    return;
+  }
+  const cur = (await getSetting<InboxItem[]>('inbox_items')) ?? [];
+  await setSetting('inbox_items', [item, ...cur]);
+}
+
+export async function markInboxRead(id: string, read: boolean): Promise<void> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    await db.runAsync('UPDATE inbox SET read = ? WHERE id = ?', read ? 1 : 0, id);
+    return;
+  }
+  const cur = (await getSetting<InboxItem[]>('inbox_items')) ?? [];
+  await setSetting('inbox_items', cur.map(i => i.id === id ? { ...i, read } : i));
+}
+
+export async function markAllInboxRead(): Promise<void> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    await db.runAsync('UPDATE inbox SET read = 1 WHERE read = 0');
+    return;
+  }
+  const cur = (await getSetting<InboxItem[]>('inbox_items')) ?? [];
+  await setSetting('inbox_items', cur.map(i => ({ ...i, read: true })));
+}
+
+export async function removeInbox(id: string): Promise<void> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM inbox WHERE id = ?', id);
+    return;
+  }
+  const cur = (await getSetting<InboxItem[]>('inbox_items')) ?? [];
+  await setSetting('inbox_items', cur.filter(i => i.id !== id));
+}
+
+export async function clearInbox(): Promise<void> {
+  if (USE_SQLITE) {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM inbox');
+    return;
+  }
+  await setSetting('inbox_items', []);
+}
+
 export async function removePrompt(id: string): Promise<void> {
   if (USE_SQLITE) {
     const db = await getDb();
@@ -405,6 +509,7 @@ export async function clearAll(): Promise<void> {
       DELETE FROM creations;
       DELETE FROM journal;
       DELETE FROM prompts;
+      DELETE FROM inbox;
       DELETE FROM settings WHERE key != 'migrated_v1';
     `);
     return;

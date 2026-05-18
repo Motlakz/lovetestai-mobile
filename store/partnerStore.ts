@@ -12,6 +12,7 @@ import { firestore } from '@/services/firebase';
 import { PartnerLink, loadPartnerLink, persistPartnerLink } from '@/services/db';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
+import { useInboxStore } from '@/store/inboxStore';
 
 interface PartnerState {
   isLoading: boolean;
@@ -236,6 +237,14 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
     };
     set({ link: next });
     await persistPartnerLink(next);
+    if (pairId) {
+      void useInboxStore.getState().push({
+        kind: 'partner_paired',
+        title: 'Paired with partner',
+        body: next.partnerLabel ? `You are now paired with ${next.partnerLabel}.` : 'Your partner connection is active.',
+        route: '/(tabs)/partner',
+      });
+    }
     get().subscribeToPair();
   },
 
@@ -301,6 +310,12 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
           };
           set({ link: next });
           await persistPartnerLink(next);
+          void useInboxStore.getState().push({
+            kind: 'partner_paired',
+            title: 'Paired with partner',
+            body: remoteLabel ? `${remoteLabel} just paired with you.` : 'Your partner just paired with you.',
+            route: '/(tabs)/partner',
+          });
           get().subscribeToPair();
         }
       }, (e) => console.log('invite listener:', e));

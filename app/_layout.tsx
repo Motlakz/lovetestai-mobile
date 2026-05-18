@@ -30,6 +30,7 @@ import { AuthGateProvider } from "@/components/auth/AuthGateModal";
 import FeedbackProvider from "@/components/ui/FeedbackProvider";
 import { useAuthStore } from "@/store/authStore";
 import { usePartnerStore } from "@/store/partnerStore";
+import { useInboxStore } from "@/store/inboxStore";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -58,6 +59,7 @@ function RootLayoutNav() {
     void (async () => {
       await useAuthStore.getState().init();
       await usePartnerStore.getState().init();
+      await useInboxStore.getState().init();
     })();
   }, []);
 
@@ -67,6 +69,12 @@ function RootLayoutNav() {
       const fire = await claimDailyPromptSlot();
       if (fire) {
         toast.info("Today's love prompt is ready in Daily.");
+        void useInboxStore.getState().push({
+          kind: 'daily_prompt',
+          title: "Today's love prompt is ready",
+          body: 'Open the Daily tab to reflect on a fresh prompt.',
+          route: '/(tabs)/daily',
+        });
       }
     })();
   }, [isLoading, onboardingComplete, toast]);

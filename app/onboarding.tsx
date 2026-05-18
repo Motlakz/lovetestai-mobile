@@ -19,6 +19,7 @@ import { ThemeColors, ThemeShadows, fontSizes, spacing, radius } from '@/constan
 import GlassCard from '@/components/ui/GlassCard';
 import GradientButton from '@/components/ui/GradientButton';
 import GhostButton from '@/components/ui/GhostButton';
+import DatePickerField from '@/components/ui/DatePickerField';
 import HeartParticles from '@/components/ui/HeartParticles';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useApp } from '@/context/AppContext';
@@ -216,9 +217,8 @@ export default function OnboardingScreen() {
           <TextInput style={styles.textInput} value={name} onChangeText={setName} placeholder="Your first name" placeholderTextColor={colors.text_muted} autoCapitalize="words" />
         </View>
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Date of birth</Text>
-          <TextInput style={styles.textInput} value={dob} onChangeText={setDob} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text_muted} keyboardType="numbers-and-punctuation" maxLength={10} />
-          <Text style={[styles.fieldLabel, { fontSize: fontSizes.xs, color: colors.text_muted, marginTop: spacing.xs, marginBottom: 0 }]}>Only used locally for calculators that need it.</Text>
+          <DatePickerField label="Date of birth" value={dob} onChange={setDob} placeholder="Select a date" />
+          <Text style={[styles.fieldLabel, { fontSize: fontSizes.xs, color: colors.text_muted, marginTop: 0, marginBottom: 0 }]}>Only used locally for calculators that need it.</Text>
         </View>
         <View style={styles.ctaRow}>
           <GradientButton label="Continue" onPress={handleNext} style={{ flex: 1 }} />

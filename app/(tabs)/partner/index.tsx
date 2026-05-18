@@ -301,7 +301,7 @@ export default function PartnerLiteScreen() {
       >
         <View style={styles.header}>
           <Ionicons name="happy-outline" size={36} color={colors.accent_rose} />
-          <Text style={[styles.title, { color: colors.text_primary }]}>Two-Player Prompts</Text>
+          <Text style={[styles.title, { color: colors.text_primary }]}>Partner Prompts</Text>
           <Text style={[styles.subtitle, { color: colors.text_secondary }]}>
             Send a prompt to someone you love and compare reflections.
           </Text>
@@ -370,7 +370,7 @@ export default function PartnerLiteScreen() {
               <>
                 <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Create a pair code</Text>
                 <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
-                  Generate a code and share it with the other tester.
+                  Generate a code and share it with your partner.
                 </Text>
                 {link?.inviteCode ? (
                   <>
@@ -399,7 +399,7 @@ export default function PartnerLiteScreen() {
               <>
                 <Text style={[styles.cardTitle, { color: colors.text_primary }]}>Enter their code</Text>
                 <Text style={[styles.cardBody, { color: colors.text_secondary }]}>
-                  Paste the 6-character code from the other device.
+                  Paste the 6-character code shared by your partner.
                 </Text>
                 <TextInput
                   value={codeInput}

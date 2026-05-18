@@ -281,10 +281,11 @@ export default function DailyScreen() {
 
   const handleSaveTodayPrompt = useCallback(() => {
     const alreadySaved = savedPrompts.some(p => p.text === todayPrompt.text);
-    if (alreadySaved) return;
+    if (alreadySaved) { toast.info('Already in your saved prompts.'); return; }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     savePrompt({ id: Date.now().toString(), text: todayPrompt.text, savedAt: new Date().toISOString() });
-  }, [todayPrompt, savePrompt, savedPrompts]);
+    toast.success('Prompt saved.');
+  }, [todayPrompt, savePrompt, savedPrompts, toast]);
 
   const openPromptDetail = useCallback((p: PromptDetail) => {
     void Haptics.selectionAsync();
@@ -302,10 +303,11 @@ export default function DailyScreen() {
   const handleDetailSave = useCallback(() => {
     if (!detailPrompt) return;
     const already = savedPrompts.some(p => p.text === detailPrompt.text);
-    if (already) return;
+    if (already) { toast.info('Already in your saved prompts.'); return; }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     savePrompt({ id: Date.now().toString(), text: detailPrompt.text, savedAt: new Date().toISOString() });
-  }, [detailPrompt, savedPrompts, savePrompt]);
+    toast.success('Prompt saved.');
+  }, [detailPrompt, savedPrompts, savePrompt, toast]);
 
   const handleDetailShare = useCallback(async () => {
     if (!detailPrompt) return;
@@ -355,14 +357,16 @@ export default function DailyScreen() {
     if (!ok) return;
     deleteSavedPrompt(id);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [deleteSavedPrompt, confirm]);
+    toast.success('Prompt removed.');
+  }, [deleteSavedPrompt, confirm, toast]);
 
   const handleDeleteJournalEntry = useCallback(async (id: string) => {
     const ok = await confirm('Delete this journal entry?');
     if (!ok) return;
     deleteJournalEntry(id);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [deleteJournalEntry, confirm]);
+    toast.success('Journal entry deleted.');
+  }, [deleteJournalEntry, confirm, toast]);
 
   const handleOpenJournalEntry = useCallback((entry: JournalEntry) => {
     void Haptics.selectionAsync();

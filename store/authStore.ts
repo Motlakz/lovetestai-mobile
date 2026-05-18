@@ -42,6 +42,8 @@ function userToAccount(user: User): AuthAccount {
 
 let authSubscribed = false;
 let authInitPromise: Promise<void> | null = null;
+let guestSignInPromise: Promise<AuthAccount> | null = null;
+let googleSignInPromise: Promise<AuthAccount> | null = null;
 
 type GoogleSigninModule = {
   GoogleSignin: {
@@ -116,17 +118,30 @@ export const useAuthStore = create<AuthState>((set) => ({
             const account = userToAccount(user);
             await persistAuthAccount(account);
             set({ account, isLoading: false });
-          } else {
+          } else if (guestSignInPromise) {
             try {
+              const account = await guestSignInPromise;
+              set({ account, isLoading: false });
+            } catch {
+              set({ account: null, isLoading: false });
+            }
+          } else {
+            guestSignInPromise = (async () => {
               const cred = await fbSignInAnonymously(auth);
               await cred.user.getIdToken(true);
               const account = userToAccount(cred.user);
               await persistAuthAccount(account);
+              return account;
+            })();
+            try {
+              const account = await guestSignInPromise;
               set({ account, isLoading: false });
             } catch (signInError) {
               console.log('Auto guest sign-in failed:', signInError);
               await persistAuthAccount(null);
               set({ account: null, isLoading: false });
+            } finally {
+              guestSignInPromise = null;
             }
           }
             resolve();
@@ -147,18 +162,44 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signInAnonymously: async () => {
     if (!firebaseAuth) throw new Error('Firebase not configured');
-    const userCred = await fbSignInAnonymously(firebaseAuth);
-    await userCred.user.getIdToken(true);
-    const account = userToAccount(userCred.user);
-    await persistAuthAccount(account);
-    set({ account });
-    return account;
+    const existing = firebaseAuth.currentUser;
+    if (existing && existing.isAnonymous) {
+      const account = userToAccount(existing);
+      await persistAuthAccount(account);
+      set({ account });
+      return account;
+    }
+    if (guestSignInPromise) return guestSignInPromise;
+    guestSignInPromise = (async () => {
+      try {
+        const userCred = await fbSignInAnonymously(firebaseAuth);
+        await userCred.user.getIdToken(true);
+        const account = userToAccount(userCred.user);
+        await persistAuthAccount(account);
+        set({ account });
+        return account;
+      } finally {
+        guestSignInPromise = null;
+      }
+    })();
+    return guestSignInPromise;
   },
 
   signInWithGoogle: async () => {
     if (!firebaseAuth) throw new Error('Firebase not configured');
+    const auth = firebaseAuth;
+    if (googleSignInPromise) return googleSignInPromise;
+    googleSignInPromise = (async () => {
+      try {
+        return await doGoogleSignIn();
+      } finally {
+        googleSignInPromise = null;
+      }
+    })();
+    return googleSignInPromise;
 
-    const googleSigninModule = await getGoogleSigninModule();
+    async function doGoogleSignIn(): Promise<AuthAccount> {
+      const googleSigninModule = await getGoogleSigninModule();
     if (!googleSigninModule) {
       throw new Error('Google Sign-In requires a development build.');
     }
@@ -180,7 +221,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
 
       const credential = GoogleAuthProvider.credential(idToken);
-      const userCred = await signInWithCredential(firebaseAuth, credential);
+      const userCred = await signInWithCredential(auth, credential);
       await userCred.user.getIdToken(true);
       const account = userToAccount(userCred.user);
       await persistAuthAccount(account);
@@ -198,17 +239,26 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
       throw error;
     }
+    }
   },
 
   signInWithGoogleIdToken: async (idToken: string, accessToken?: string) => {
     if (!firebaseAuth) throw new Error('Firebase not configured');
-    const credential = GoogleAuthProvider.credential(idToken, accessToken);
-    const userCred = await signInWithCredential(firebaseAuth, credential);
-    await userCred.user.getIdToken(true);
-    const account = userToAccount(userCred.user);
-    await persistAuthAccount(account);
-    set({ account });
-    return account;
+    if (googleSignInPromise) return googleSignInPromise;
+    googleSignInPromise = (async () => {
+      try {
+        const credential = GoogleAuthProvider.credential(idToken, accessToken);
+        const userCred = await signInWithCredential(firebaseAuth, credential);
+        await userCred.user.getIdToken(true);
+        const account = userToAccount(userCred.user);
+        await persistAuthAccount(account);
+        set({ account });
+        return account;
+      } finally {
+        googleSignInPromise = null;
+      }
+    })();
+    return googleSignInPromise;
   },
 
   signOut: async () => {

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme, ThemeMode } from '@/context/ThemeContext';
 import { ThemeColors, fontSizes, spacing, radius } from '@/constants/theme';
 import ScreenBackground from '@/components/ui/ScreenBackground';
@@ -26,6 +26,7 @@ import GradientButton from '@/components/ui/GradientButton';
 import GhostButton from '@/components/ui/GhostButton';
 import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
+import DatePickerField from '@/components/ui/DatePickerField';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/ui/Toast';
@@ -354,6 +355,7 @@ function createStyles(c: ThemeColors) {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ notif?: string }>();
   const { colors, mode, setThemeMode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { profile, savedCreations, streakData, completedTests, deleteCreation, deleteCreations, updateProfile, resetApp } = useApp();
@@ -393,6 +395,13 @@ export default function ProfileScreen() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (params?.notif === '1') {
+      setNotifModalVisible(true);
+      router.setParams({ notif: undefined });
+    }
+  }, [params?.notif, router]);
 
   const selectionActive = selectedCreationIds.length > 0;
 
@@ -669,9 +678,9 @@ export default function ProfileScreen() {
 
   const handleTwoPlayerInfo = useCallback(() => {
     alert({
-      title: 'Two-Player Prompts',
+      title: 'Partner Prompts',
       message:
-        'Start pairing with a demo tester account or Google, then share your 6-character pair code with someone you love. Once they accept, you both share the same daily prompt. Reflect on it together - your responses stay private to each of you until you choose to share them.',
+        'Start pairing with a Guest Account or Google, then share your 6-character pair code with someone you love. Once they accept, you both share the same daily prompt. Reflect on it together - your responses stay private to each of you until you choose to share them.',
       icon: 'people-outline',
       buttons: [
         { text: 'Open Partner Mode', onPress: () => router.push('/(tabs)/partner' as any) },
@@ -744,7 +753,7 @@ export default function ProfileScreen() {
                   color={colors.accent_rose}
                 />
                 <Text style={styles.accountChipText} numberOfLines={1}>
-                  {account.provider === 'anonymous' ? 'Demo tester' : account.email}
+                  {account.provider === 'anonymous' ? 'Guest User' : account.email}
                 </Text>
               </View>
             )}
@@ -856,7 +865,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.text_muted} />
           </TouchableOpacity>
 
-          {renderSettingsRow('people-outline', 'Two-Player Prompts', handleTwoPlayerInfo)}
+          {renderSettingsRow('people-outline', 'Partner Prompts', handleTwoPlayerInfo)}
           {renderSettingsRow('notifications-outline', 'Notification Preferences', handleNotificationPrefs)}
           {renderSettingsRow('language-outline', 'Language', handleLanguage, 'Soon')}
           {renderSettingsRow('star-outline', 'Rate Love Test AI', handleRateApp)}
@@ -896,15 +905,11 @@ export default function ProfileScreen() {
               />
             </View>
             <View>
-              <Text style={styles.modalFieldLabel}>Date of Birth</Text>
-              <TextInput
-                style={styles.modalInput}
+              <DatePickerField
+                label="Date of Birth"
                 value={editDob}
-                onChangeText={setEditDob}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.text_muted}
-                keyboardType="numbers-and-punctuation"
-                maxLength={10}
+                onChange={setEditDob}
+                placeholder="Select a date"
               />
               <Text style={styles.dobNote}>Used only for compatibility calculations</Text>
             </View>
