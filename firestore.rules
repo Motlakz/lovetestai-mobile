@@ -6,6 +6,26 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isShortText(v, max) {
+      return v is string && v.size() > 0 && v.size() <= max;
+    }
+
+    function isOptionalText(v, max) {
+      return v == null || (v is string && v.size() <= max);
+    }
+
+    function isOptionalBool(v) {
+      return v == null || v is bool;
+    }
+
+    function isOptionalScore(v) {
+      return v == null || (v is int && v >= 0 && v <= 100);
+    }
+
+    function isOptionalRating(v) {
+      return v == null || (v is int && v >= 1 && v <= 5);
+    }
+
     function isInviteOwner() {
       return signedIn() && resource.data.ownerUid == request.auth.uid;
     }
@@ -25,7 +45,8 @@ service cloud.firestore {
     }
 
     match /invites/{code} {
-      allow read: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
 
       allow create: if isInviteCreateOwner()
         && code.matches('^[A-Z0-9]{6}$')
@@ -92,8 +113,101 @@ service cloud.firestore {
       }
     }
 
+    function isWebFeedbackCreate() {
+      return request.resource.data.keys().hasOnly([
+          'calculatorType',
+          'score',
+          'accuracyRating',
+          'starRating',
+          'wouldRecommend',
+          'comments',
+          'email',
+          'sessionId',
+          'userAgent',
+          'timestamp',
+          'createdAt'
+        ])
+        && isShortText(request.resource.data.calculatorType, 32)
+        && isOptionalScore(request.resource.data.score)
+        && isOptionalBool(request.resource.data.accuracyRating)
+        && isOptionalRating(request.resource.data.starRating)
+        && isOptionalBool(request.resource.data.wouldRecommend)
+        && request.resource.data.comments is string
+        && request.resource.data.comments.size() <= 2000
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 320
+        && isShortText(request.resource.data.sessionId, 128)
+        && request.resource.data.userAgent is string
+        && request.resource.data.userAgent.size() <= 1024
+        && request.resource.data.timestamp is timestamp
+        && isShortText(request.resource.data.createdAt, 64);
+    }
+
+    function isMobileFeedbackCreate() {
+      return request.resource.data.keys().hasOnly([
+          'calculatorType',
+          'source',
+          'score',
+          'accuracyRating',
+          'starRating',
+          'wouldRecommend',
+          'comments',
+          'email',
+          'sessionId',
+          'accountId',
+          'platform',
+          'appSurface',
+          'createdAt'
+        ])
+        && isShortText(request.resource.data.calculatorType, 80)
+        && request.resource.data.calculatorType == request.resource.data.source
+        && isShortText(request.resource.data.source, 80)
+        && isOptionalScore(request.resource.data.score)
+        && isOptionalBool(request.resource.data.accuracyRating)
+        && request.resource.data.starRating is int
+        && request.resource.data.starRating >= 1
+        && request.resource.data.starRating <= 5
+        && isOptionalBool(request.resource.data.wouldRecommend)
+        && request.resource.data.comments is string
+        && request.resource.data.comments.size() <= 2000
+        && isOptionalText(request.resource.data.email, 320)
+        && isShortText(request.resource.data.sessionId, 128)
+        && isOptionalText(request.resource.data.accountId, 128)
+        && request.resource.data.platform in ['android', 'ios', 'web']
+        && request.resource.data.appSurface == 'mobile'
+        && request.resource.data.createdAt is timestamp
+        && (!signedIn()
+            || request.resource.data.accountId == null
+            || request.resource.data.accountId == request.auth.uid);
+    }
+
+    // Feedback is written from both the web (unauthenticated) and mobile (auth'd).
+    // Keep create open but enforce exact web/mobile schemas, value ranges, and string caps
+    // so the endpoint cannot be abused as arbitrary storage.
     match /feedback/{feedbackId} {
-      allow create: if true;
+      allow create: if isWebFeedbackCreate() || isMobileFeedbackCreate();
+      allow read, update, delete: if false;
+    }
+
+    // Mobile-only analytics -- mobile app always has anonymous auth available,
+    // but keep create open in case the web shares this collection later. Validate shape.
+    match /mobile_analytics_events/{eventId} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'name',
+          'params',
+          'deviceId',
+          'platform',
+          'appVersion',
+          'createdAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.deviceId is string
+        && request.resource.data.deviceId.size() <= 128;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

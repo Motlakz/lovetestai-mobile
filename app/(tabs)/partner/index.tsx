@@ -10,6 +10,7 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import GlassCard from '@/components/ui/GlassCard';
 import GradientButton from '@/components/ui/GradientButton';
 import GhostButton from '@/components/ui/GhostButton';
+import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
 import { useTheme } from '@/context/ThemeContext';
 import { fontSizes, radius, spacing } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
@@ -326,6 +327,8 @@ export default function PartnerLiteScreen() {
           </View>
         )}
 
+        {!isPaired && <AdMobNativeAd placement="partner_after_pair_steps" />}
+
         {!account && isAuthLoading && (
           <GlassCard style={styles.card}>
             <Ionicons name="hourglass-outline" size={28} color={colors.accent_violet} />
@@ -424,6 +427,8 @@ export default function PartnerLiteScreen() {
           </GlassCard>
         )}
 
+        {account && !isPaired && <AdMobNativeAd placement="partner_after_pair_create_card" />}
+
         {account && isPaired && link && (
           <>
             <GlassCard style={styles.card}>
@@ -510,6 +515,8 @@ export default function PartnerLiteScreen() {
               ))}
             </View>
 
+            <AdMobNativeAd placement="partner_before_prompt" />
+
             <GlassCard style={styles.card}>
               <View style={styles.scoreHeader}>
                 <Ionicons name="sparkles-outline" size={22} color={colors.accent_rose} />
@@ -557,6 +564,8 @@ export default function PartnerLiteScreen() {
               <GhostButton label="Copy prompt externally" onPress={handleSharePrompt} />
               <GhostButton label="Browse more prompts" onPress={() => router.push('/(tabs)/daily' as any)} />
             </GlassCard>
+
+            <AdMobNativeAd placement="partner_after_prompt" />
 
             {shares.length > 0 && (
               <GlassCard style={styles.card}>

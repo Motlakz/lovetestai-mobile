@@ -155,8 +155,12 @@ export function isEncrypted(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith(PREFIX);
 }
 
-// Helper for partner sync: derives the per-pair key from local PartnerLink fields.
+// Helper for partner sync: derive from the invite code both partners entered/owned.
+// The pair id scopes the key to this relationship; the shared code is the secret.
 export async function derivePairKey(pairId: string, inviteCode?: string | null, partnerCode?: string | null): Promise<Uint8Array> {
-  const codes = [inviteCode ?? '', partnerCode ?? ''].sort().join(':');
-  return deriveKey(pairId, codes);
+  const sharedCode = (partnerCode || inviteCode || '').trim().toUpperCase();
+  if (!sharedCode) {
+    throw new Error('Missing pair secret');
+  }
+  return deriveKey('pair-v2', pairId, sharedCode);
 }

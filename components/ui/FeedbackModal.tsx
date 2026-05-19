@@ -19,6 +19,7 @@ import GhostButton from './GhostButton';
 import { useToast } from './Toast';
 import { submitInternalFeedback } from '@/services/feedback';
 import { useAuthStore } from '@/store/authStore';
+import { trackFeedback } from '@/services/analytics';
 
 interface FeedbackModalProps {
   visible: boolean;
@@ -51,6 +52,7 @@ export default function FeedbackModal({ visible, onClose, source = 'app', onSubm
 
   useEffect(() => {
     if (visible) {
+      trackFeedback('opened', { source, trigger: 'modal_visible' });
       setRating(0);
       setComment('');
       setSubmitted(false);
@@ -64,6 +66,7 @@ export default function FeedbackModal({ visible, onClose, source = 'app', onSubm
   const handleSelectRating = useCallback((value: number) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRating(value);
+    trackFeedback('rating_selected', { source, star_rating: value });
 
     scaleAnims.forEach((anim, i) => {
       Animated.sequence([
@@ -100,6 +103,7 @@ export default function FeedbackModal({ visible, onClose, source = 'app', onSubm
       }, 2000);
     } catch (error) {
       console.log('Feedback submit failed:', error);
+      trackFeedback('submit_failed', { source });
       toast.error('Could not submit feedback right now. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -124,7 +128,7 @@ export default function FeedbackModal({ visible, onClose, source = 'app', onSubm
 
               <View style={styles.ratingRow}>
                 {RATING_CONFIG.map((item, index) => (
-                  <Animated.View key={item.value} style={{ transform: [{ scale: scaleAnims[index] }] }}>
+                  <Animated.View key={item.value} style={[styles.ratingItemWrap, { transform: [{ scale: scaleAnims[index] }] }]}>
                     <TouchableOpacity
                       onPress={() => handleSelectRating(item.value)}
                       style={[
@@ -189,12 +193,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   card: {
     width: '100%',
-    maxWidth: 380,
-    padding: spacing.xl,
+    maxWidth: 420,
+    padding: spacing.lg,
     gap: spacing.lg,
     borderWidth: 1,
     borderRadius: radius.xl,
@@ -219,12 +223,16 @@ const styles = StyleSheet.create({
   },
   ratingRow: {
     flexDirection: 'row' as const,
-    justifyContent: 'center' as const,
-    gap: spacing.md,
+    justifyContent: 'space-between' as const,
+    gap: spacing.sm,
+  },
+  ratingItemWrap: {
+    flex: 1,
+    maxWidth: 60,
   },
   ratingItem: {
-    width: 52,
-    height: 52,
+    width: '100%' as const,
+    aspectRatio: 1,
     borderRadius: 16,
     borderWidth: 1.5,
     alignItems: 'center' as const,

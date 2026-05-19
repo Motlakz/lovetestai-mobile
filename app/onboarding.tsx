@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import {
   savePrefs as saveNotifPrefs,
 } from '@/services/notifications';
 import { useToast } from '@/components/ui/Toast';
+import { trackOnboardingStep, trackScreen } from '@/services/analytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -104,9 +105,18 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const toast = useToast();
 
+  useEffect(() => {
+    trackScreen('onboarding', { step_index: currentSlide });
+  }, [currentSlide]);
+
   const finish = useCallback(() => {
     updateProfile({ ...profile, name, relationshipStatus: '', dateOfBirth: dob, intent });
     completeOnboarding();
+    trackOnboardingStep('account_choice', 'completed', {
+      intent_selected: !!intent,
+      has_name: !!name,
+      has_date_of_birth: !!dob,
+    });
     router.replace('/(tabs)/(home)');
   }, [completeOnboarding, dob, intent, name, profile, router, updateProfile]);
 
@@ -134,11 +144,12 @@ export default function OnboardingScreen() {
   }, [finish, openSignIn]);
 
   const goToSlide = useCallback((index: number) => {
+    trackOnboardingStep(String(currentSlide), 'next', { next_step: index });
     Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
       setCurrentSlide(index);
       Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
     });
-  }, [fadeAnim]);
+  }, [currentSlide, fadeAnim]);
 
   const handleNext = useCallback(() => {
     if (currentSlide < 4) goToSlide(currentSlide + 1);
@@ -149,6 +160,7 @@ export default function OnboardingScreen() {
     try {
       await saveNotifPrefs({
         enabled: true,
+        soundEnabled: true,
         hour: notifHour,
         minute: notifMinute,
         frequency: notifFrequency,

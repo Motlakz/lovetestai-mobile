@@ -1,8 +1,17 @@
 import { zodiacLocal, birthdateLocal, loveScoreLocal, numerologyLocal, soulmateLocal, quizLocal } from './localEngine';
+import {
+  trackError,
+  trackGeneratorCompleted,
+  trackGeneratorFailed,
+  trackGeneratorStarted,
+} from '@/services/analytics';
 
 const PLATFORM_API_BASE =
   process.env.EXPO_PUBLIC_LOVETESTAI_API_BASE_URL?.replace(/\/$/, '') ||
   'https://lovetestai.com';
+
+const ENABLE_LOCAL_CONTENT_FALLBACK =
+  process.env.EXPO_PUBLIC_ENABLE_LOCAL_AI_FALLBACK === 'true';
 
 const CONTENT_ROUTES: Partial<Record<string, string>> = {
   'love-letter': '/api/generate-letter',
@@ -100,10 +109,23 @@ async function postToPlatform(route: string, body: unknown): Promise<string | nu
     body: JSON.stringify(body),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    const details = await readResponseDetails(response);
+    throw new Error(`Platform API request failed: ${route} ${response.status}${details ? ` ${details}` : ''}`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return extractTaggedLetter(await response.text());
+  }
 
   const data = await response.json() as PlatformGenerationResponse;
   return getResponseText(data);
+}
+
+function extractTaggedLetter(text: string): string {
+  const match = text.match(/<LETTER>([\s\S]*?)<\/LETTER>/);
+  return (match?.[1] || text).trim();
 }
 
 export async function fetchPrompts(category = 'All', limit = 30): Promise<PlatformPrompt[] | null> {
@@ -125,17 +147,28 @@ export async function fetchPrompts(category = 'All', limit = 30): Promise<Platfo
 
 export async function generateContent(params: GenerateParams): Promise<string> {
   const route = CONTENT_ROUTES[params.tool];
+  trackGeneratorStarted(params.tool);
 
   if (route) {
     try {
       const text = await postToPlatform(route, buildContentPayload(params));
-      if (text) return text;
+      if (text) {
+        trackGeneratorCompleted(params.tool, 'platform');
+        return text;
+      }
     } catch (error) {
+      trackGeneratorFailed(params.tool, 'platform_route_failed');
       console.log(`[AI] Platform route failed: ${route}`, error);
     }
   }
 
+  if (!ENABLE_LOCAL_CONTENT_FALLBACK) {
+    trackGeneratorFailed(params.tool, 'local_fallback_disabled');
+    throw new Error(`AI generation failed for ${params.tool}. Local mock fallback is disabled.`);
+  }
+
   await simulateDelay();
+  trackGeneratorCompleted(params.tool, 'local_mock');
   return getMockResponse(params.tool, params);
 }
 
@@ -159,8 +192,8 @@ function buildContentPayload(params: GenerateParams): Record<string, unknown> {
     return {
       sender: name1,
       recipient: name2,
-      occasion: params.occasion || 'just because',
-      vibe: params.tone || 'romantic and heartfelt',
+      occasion: toLoveNoteOccasion(params.occasion),
+      vibe: toLoveNoteVibe(params.tone || params.vibe),
       detail: params.message || params.detail || params.memory || '',
       withEmoji: false,
       rhyming: false,
@@ -181,13 +214,66 @@ function buildContentPayload(params: GenerateParams): Record<string, unknown> {
   return {
     name1,
     name2,
-    tone: params.tone,
-    length: params.length,
-    occasion: params.occasion,
-    details: params.detail,
-    memory: params.memory,
+    theme: toLetterTheme(params.occasion || params.style || params.detail),
+    tone: toLetterTone(params.tone),
+    letterType: toLetterType(params.style),
+    formality: 'informal',
+    letterLength: params.length === 'Long' ? 5 : params.length === 'Short' ? 2 : 3,
+    feeling: params.vibe || params.tone || '',
+    occasion: params.occasion || '',
+    personalNote: params.detail || params.memory || params.message || '',
+    recaptchaToken: 'mobile',
     source: 'mobile',
   };
+}
+
+function toLetterTheme(value?: string): string {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('anniversary')) return 'anniversary';
+  if (normalized.includes('distance')) return 'long-distance';
+  if (normalized.includes('apolog')) return 'apology';
+  if (normalized.includes('appreciat') || normalized.includes('thank')) return 'appreciation';
+  if (normalized.includes('missing')) return 'missing-you';
+  return 'romance';
+}
+
+function toLetterTone(value?: string): string {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('play')) return 'playful';
+  if (normalized.includes('heart')) return 'heartfelt';
+  if (normalized.includes('poet') || normalized.includes('dream')) return 'poetic';
+  if (normalized.includes('nostalg')) return 'nostalgic';
+  return 'romantic';
+}
+
+function toLetterType(value?: string): string {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('formal')) return 'formal';
+  if (normalized.includes('poet')) return 'poetic';
+  if (normalized.includes('passion')) return 'passionate';
+  return 'casual';
+}
+
+function toLoveNoteOccasion(value?: string): string {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('valentine')) return "valentine's day";
+  if (normalized.includes('anniversary')) return 'anniversary';
+  if (normalized.includes('distance')) return 'long distance';
+  if (normalized.includes('apolog')) return 'apology';
+  if (normalized.includes('missing')) return 'missing you';
+  if (normalized.includes('morning')) return 'good morning';
+  if (normalized.includes('night')) return 'good night';
+  return 'just because';
+}
+
+function toLoveNoteVibe(value?: string): string {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('play') || normalized.includes('flirt')) return 'playful and flirty';
+  if (normalized.includes('poet') || normalized.includes('dream')) return 'poetic and dreamy';
+  if (normalized.includes('simple') || normalized.includes('sweet')) return 'sweet and simple';
+  if (normalized.includes('passion') || normalized.includes('intense')) return 'passionate and intense';
+  if (normalized.includes('nostalg') || normalized.includes('tender')) return 'nostalgic and tender';
+  return 'romantic and heartfelt';
 }
 
 function toneToQuoteTone(tone?: string): string {
@@ -210,8 +296,10 @@ export async function analyzeLoveCompatibility(
     const data = await postJson<{ result: string; adjustedScore?: number }>('/api/analyze-compatibility', {
       person1, person2, loveLanguage1, loveLanguage2, score, recaptchaToken,
     });
+    trackGeneratorCompleted('love-quiz', 'platform');
     return { result: data.result, adjustedScore: data.adjustedScore ?? score };
   } catch {
+    trackError('analyze_compatibility', 'platform_failed_local_fallback');
     return quizLocal(loveLanguage1, loveLanguage2, score);
   }
 }
@@ -224,8 +312,11 @@ export async function calculateLoveScore(
   recaptchaToken?: string
 ): Promise<{ score: number; insight: string; message: string }> {
   try {
-    return await postJson('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
+    const result = await postJson<{ score: number; insight: string; message: string }>('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
+    trackGeneratorCompleted('love-score', 'platform');
+    return result;
   } catch {
+    trackError('calculate_love_score', 'platform_failed_local_fallback');
     return loveScoreLocal(name1, name2, relationshipStatus, duration);
   }
 }
@@ -236,8 +327,11 @@ export async function calculateZodiacCompatibility(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    return await postJson('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
+    trackGeneratorCompleted('zodiac', 'platform');
+    return result;
   } catch {
+    trackError('zodiac_compatibility', 'platform_failed_local_fallback');
     return zodiacLocal(sign1, sign2);
   }
 }
@@ -248,8 +342,11 @@ export async function calculateBirthdateCompatibility(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    return await postJson('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
+    trackGeneratorCompleted('birthdate', 'platform');
+    return result;
   } catch {
+    trackError('birthdate_compatibility', 'platform_failed_local_fallback');
     return birthdateLocal(date1, date2);
   }
 }
@@ -262,8 +359,11 @@ export async function calculateNumerology(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    return await postJson('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
+    trackGeneratorCompleted('numerology', 'platform');
+    return result;
   } catch {
+    trackError('numerology', 'platform_failed_local_fallback');
     return numerologyLocal(name1, name2, date1, date2);
   }
 }
@@ -277,8 +377,11 @@ export async function findSoulmate(data: {
   recaptchaToken?: string;
 }): Promise<{ analysis: string; traits: string[] }> {
   try {
-    return await postJson('/api/soulmate-finder', data);
+    const result = await postJson<{ analysis: string; traits: string[] }>('/api/soulmate-finder', data);
+    trackGeneratorCompleted('soulmate', 'platform');
+    return result;
   } catch {
+    trackError('soulmate_finder', 'platform_failed_local_fallback');
     return soulmateLocal(data.name, data.zodiacSign, data.interests, data.loveLanguage);
   }
 }
@@ -291,6 +394,7 @@ export async function generatePoem(
   rhyming: boolean,
   recaptchaToken?: string
 ): Promise<string> {
+  trackGeneratorStarted('love-poem');
   const data = await postJson<{ poem: string }>('/api/generate-poem', {
     name1,
     name2,
@@ -299,6 +403,7 @@ export async function generatePoem(
     rhyming,
     recaptchaToken,
   });
+  trackGeneratorCompleted('love-poem', 'platform');
   return data.poem;
 }
 
@@ -313,18 +418,32 @@ async function postJson<T>(route: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Platform API request failed: ${route}`);
+    const details = await readResponseDetails(response);
+    throw new Error(`Platform API request failed: ${route} ${response.status}${details ? ` ${details}` : ''}`);
   }
 
   return await response.json() as T;
+}
+
+async function readResponseDetails(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    return text.slice(0, 500);
+  } catch {
+    return '';
+  }
 }
 
 export async function sendCoachMessage(messages: { role: string; content: string }[]): Promise<string> {
   for (const route of ['/api/ai/coach', '/api/coach'] as const) {
     try {
       const text = await postToPlatform(route, { messages, source: 'mobile' });
-      if (text) return text;
+      if (text) {
+        trackGeneratorCompleted('coach', 'platform');
+        return text;
+      }
     } catch (error) {
+      trackError('coach', 'platform_route_failed');
       console.log(`[AI] Coach route failed: ${route}`, error);
     }
   }
@@ -338,8 +457,12 @@ export async function rewriteMessage(originalMessage: string, tone: string): Pro
   for (const route of ['/api/ai/rewrite', '/api/rewrite'] as const) {
     try {
       const text = await postToPlatform(route, { originalMessage, tone, source: 'mobile' });
-      if (text) return text;
+      if (text) {
+        trackGeneratorCompleted('rewrite', 'platform');
+        return text;
+      }
     } catch (error) {
+      trackError('rewrite', 'platform_route_failed');
       console.log(`[AI] Rewrite route failed: ${route}`, error);
     }
   }

@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth as firebaseAuth } from '@/services/firebase';
 import { AuthAccount, getOrCreateDeviceId, loadAuthAccount, persistAuthAccount } from '@/services/db';
+import { trackCrud, trackEvent } from '@/services/analytics';
 
 interface AuthState {
   isLoading: boolean;
@@ -117,10 +118,12 @@ export const useAuthStore = create<AuthState>((set) => ({
           if (user) {
             const account = userToAccount(user);
             await persistAuthAccount(account);
+            trackEvent('auth_restored', { provider: account.provider ?? null });
             set({ account, isLoading: false });
           } else if (guestSignInPromise) {
             try {
               const account = await guestSignInPromise;
+              trackEvent('auth_sign_in', { provider: account.provider ?? 'anonymous', trigger: 'auto_guest' });
               set({ account, isLoading: false });
             } catch {
               set({ account: null, isLoading: false });
@@ -135,6 +138,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             })();
             try {
               const account = await guestSignInPromise;
+              trackEvent('auth_sign_in', { provider: account.provider ?? 'anonymous', trigger: 'auto_guest' });
               set({ account, isLoading: false });
             } catch (signInError) {
               console.log('Auto guest sign-in failed:', signInError);
@@ -166,6 +170,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (existing && existing.isAnonymous) {
       const account = userToAccount(existing);
       await persistAuthAccount(account);
+      trackEvent('auth_sign_in', { provider: account.provider ?? 'anonymous', trigger: 'existing_guest' });
       set({ account });
       return account;
     }
@@ -176,6 +181,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         await userCred.user.getIdToken(true);
         const account = userToAccount(userCred.user);
         await persistAuthAccount(account);
+        trackEvent('auth_sign_in', { provider: account.provider ?? 'anonymous', trigger: 'guest' });
         set({ account });
         return account;
       } finally {
@@ -225,6 +231,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await userCred.user.getIdToken(true);
       const account = userToAccount(userCred.user);
       await persistAuthAccount(account);
+      trackEvent('auth_sign_in', { provider: account.provider ?? 'google', trigger: 'google' });
       set({ account });
       return account;
     } catch (error: any) {
@@ -252,6 +259,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         await userCred.user.getIdToken(true);
         const account = userToAccount(userCred.user);
         await persistAuthAccount(account);
+        trackEvent('auth_sign_in', { provider: account.provider ?? 'google', trigger: 'google_token' });
         set({ account });
         return account;
       } finally {
@@ -268,6 +276,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.log('Firebase signOut failed:', e);
     }
     await persistAuthAccount(null);
+    trackCrud('auth_account', 'delete');
     set({ account: null });
   },
 }));

@@ -19,6 +19,8 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import GlassCard from '@/components/ui/GlassCard';
 import GoldBadge from '@/components/ui/GoldBadge';
 import SectionTitle from '@/components/ui/SectionTitle';
+import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
+import InAppPromoCard from '@/components/promos/InAppPromoCard';
 import { useApp } from '@/context/AppContext';
 import { useInboxStore, unreadCount } from '@/store/inboxStore';
 import InboxModal from '@/components/ui/InboxModal';
@@ -75,6 +77,9 @@ export default function HomeScreen() {
   const { profile } = useApp();
   const [inboxOpen, setInboxOpen] = useState(false);
   const unread = useInboxStore(s => unreadCount(s.items));
+  const showFirstPartyPromoSlot = useMemo(() => {
+    return Math.floor(Date.now() / 86400000) % 2 === 0;
+  }, []);
 
   const FEATURES: FeatureCard[] = useMemo(() => [
     { id: 'love-letter', icon: 'mail-outline', label: 'Love Letter', description: 'Write a heartfelt, personal letter', gradient: [colors.grad_rose_start, colors.grad_rose_end], route: '/create-mode?tool=love-letter' },
@@ -136,6 +141,8 @@ export default function HomeScreen() {
             <Text style={styles.greetingSub}>Write to your loved one, test your compatibility, or find some love prompts.</Text>
           </View>
 
+          <AdMobNativeAd placement="home_below_greeting" />
+
           <SectionTitle title="Create Something Beautiful" />
           <View style={styles.cardGrid}>
             {FEATURES.map((feature, index) => (
@@ -163,6 +170,8 @@ export default function HomeScreen() {
               </Animated.View>
             ))}
           </View>
+
+          <AdMobNativeAd placement="home_before_quick_actions" />
 
           <SectionTitle title="Quick Actions" />
           <View style={styles.quickActionsRow}>
@@ -204,6 +213,12 @@ export default function HomeScreen() {
               </View>
             </GlassCard>
           </TouchableOpacity>
+
+          {showFirstPartyPromoSlot ? (
+            <InAppPromoCard promoId="speakdiary" placement="home_after_partner_prompts" />
+          ) : (
+            <AdMobNativeAd placement="home_after_partner_prompts" />
+          )}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>

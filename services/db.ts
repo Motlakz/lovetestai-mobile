@@ -300,6 +300,7 @@ export async function persistPartnerLink(link: PartnerLink | null): Promise<void
 
 export interface PersistedNotifPrefs {
   enabled: boolean;
+  soundEnabled?: boolean;
   hour: number;
   minute: number;
   frequency: 'daily' | '3x_week' | 'weekly' | 'monthly';

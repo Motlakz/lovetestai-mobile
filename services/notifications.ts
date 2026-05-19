@@ -4,13 +4,15 @@ export type NotifFrequency = 'daily' | '3x_week' | 'weekly' | 'monthly';
 
 export interface NotifPrefs {
   enabled: boolean;
+  soundEnabled: boolean;
   hour: number;
   minute: number;
   frequency: NotifFrequency;
 }
 
 export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
-  enabled: false,
+  enabled: true,
+  soundEnabled: true,
   hour: 9,
   minute: 0,
   frequency: 'daily',

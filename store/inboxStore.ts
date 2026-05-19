@@ -9,6 +9,9 @@ import {
   type InboxItem,
   type InboxKind,
 } from '@/services/db';
+import { trackCrud } from '@/services/analytics';
+import { loadPrefs as loadNotifPrefs } from '@/services/notifications';
+import { playUiSound } from '@/services/sounds';
 
 interface InboxState {
   isLoading: boolean;
@@ -39,6 +42,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   init: async () => {
     try {
       const items = await listInbox();
+      trackCrud('inbox_item', 'read', { count: items.length });
       set({ items, isLoading: false });
     } catch (e) {
       console.log('Inbox init failed:', e);
@@ -61,6 +65,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       return item;
     }
     set({ items: [item, ...get().items] });
+    trackCrud('inbox_item', 'create', { kind: item.kind });
+    void loadNotifPrefs()
+      .then((prefs) => {
+        if (prefs.enabled && prefs.soundEnabled) void playUiSound('messagePing');
+      })
+      .catch(() => undefined);
     try {
       await insertInbox(item);
     } catch (e) {
@@ -71,21 +81,25 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   markRead: async (id, read = true) => {
     set({ items: get().items.map(i => i.id === id ? { ...i, read } : i) });
+    trackCrud('inbox_item', 'update', { field: 'read', read });
     try { await markInboxRead(id, read); } catch (e) { console.log('Inbox mark read failed:', e); }
   },
 
   markAllRead: async () => {
     set({ items: get().items.map(i => ({ ...i, read: true })) });
+    trackCrud('inbox_item', 'update', { field: 'read_all' });
     try { await dbMarkAllRead(); } catch (e) { console.log('Inbox mark all read failed:', e); }
   },
 
   remove: async (id) => {
     set({ items: get().items.filter(i => i.id !== id) });
+    trackCrud('inbox_item', 'delete');
     try { await removeInbox(id); } catch (e) { console.log('Inbox remove failed:', e); }
   },
 
   clear: async () => {
     set({ items: [] });
+    trackCrud('inbox_item', 'clear');
     try { await dbClearInbox(); } catch (e) { console.log('Inbox clear failed:', e); }
   },
 }));

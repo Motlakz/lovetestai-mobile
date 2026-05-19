@@ -23,6 +23,7 @@ import {
   removePrompt,
 } from '@/services/db';
 import { useFeedbackStore } from '@/store/feedbackStore';
+import { trackCrud, trackEvent } from '@/services/analytics';
 
 interface AppState {
   isLoading: boolean;
@@ -81,6 +82,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     try {
       const snap: AppSnapshot = await loadSnapshot();
+      trackCrud('app_snapshot', 'read', {
+        saved_creations: snap.savedCreations.length,
+        journal_entries: snap.journalEntries.length,
+        saved_prompts: snap.savedPrompts.length,
+        onboarding_complete: snap.onboardingComplete,
+      });
       set({
         isLoading: false,
         onboardingComplete: snap.onboardingComplete,
@@ -101,28 +108,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   completeOnboarding: () => {
     set({ onboardingComplete: true });
     void persistOnboardingComplete(true);
+    trackEvent('onboarding_completed');
   },
 
   updateProfile: (p) => {
     set({ profile: p });
     void persistProfile(p);
+    trackCrud('profile', 'update', {
+      has_name: !!p.name,
+      has_date_of_birth: !!p.dateOfBirth,
+      has_intent: !!p.intent,
+      relationship_status_set: !!p.relationshipStatus,
+    });
   },
 
   saveCreation: (c) => {
     set((s) => ({ savedCreations: [c, ...s.savedCreations] }));
     void insertCreation(c);
+    trackCrud('creation', 'create', { creation_type: c.type });
     void useFeedbackStore.getState().recordUse(`creation:${c.type}`);
   },
 
   deleteCreation: (id) => {
     set((s) => ({ savedCreations: s.savedCreations.filter((x) => x.id !== id) }));
     void removeCreation(id);
+    trackCrud('creation', 'delete');
   },
 
   deleteCreations: (ids) => {
     const removeSet = new Set(ids);
     set((s) => ({ savedCreations: s.savedCreations.filter((x) => !removeSet.has(x.id)) }));
     void removeCreations(ids);
+    trackCrud('creation', 'bulk_delete', { count: removeSet.size });
   },
 
   saveJournalEntry: (e) => {
@@ -133,6 +150,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     void insertJournalEntry(e);
     void persistStreak(newStreak);
+    trackCrud('journal_entry', 'create');
+    trackEvent('daily_prompt_completed', { streak: newStreak.streak });
     void useFeedbackStore.getState().recordUse('journal');
   },
 
@@ -144,28 +163,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       journalEntries: s.journalEntries.map((j) => (j.id === id ? updated : j)),
     }));
     void insertJournalEntry(updated);
+    trackCrud('journal_entry', 'update');
   },
 
   savePrompt: (p) => {
     set((s) => ({ savedPrompts: [p, ...s.savedPrompts] }));
     void insertPrompt(p);
+    trackCrud('saved_prompt', 'create');
     void useFeedbackStore.getState().recordUse('prompt');
   },
 
   deleteSavedPrompt: (id) => {
     set((s) => ({ savedPrompts: s.savedPrompts.filter((x) => x.id !== id) }));
     void removePrompt(id);
+    trackCrud('saved_prompt', 'delete');
   },
 
   deleteJournalEntry: (id) => {
     set((s) => ({ journalEntries: s.journalEntries.filter((x) => x.id !== id) }));
     void removeJournalEntry(id);
+    trackCrud('journal_entry', 'delete');
   },
 
   incrementTests: () => {
     const next = get().completedTests + 1;
     set({ completedTests: next });
     void persistCompletedTests(next);
+    trackEvent('test_completed', { completed_tests: next });
     void useFeedbackStore.getState().recordUse('test');
   },
 
@@ -180,6 +204,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streakData: EMPTY_STREAK,
     });
     void clearAll();
+    trackCrud('app_data', 'clear');
   },
 }));
 

@@ -28,6 +28,7 @@ import GoldDivider from '@/components/ui/GoldDivider';
 import DatePickerField from '@/components/ui/DatePickerField';
 import SectionTitle from '@/components/ui/SectionTitle';
 import LegalSheet from '@/components/ui/LegalSheet';
+import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legalContent';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/ui/Toast';
@@ -390,6 +391,7 @@ export default function ProfileScreen() {
   const [viewingCreation, setViewingCreation] = useState<SavedCreation | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [notifEnabled, setNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.enabled);
+  const [notifSoundEnabled, setNotifSoundEnabled] = useState(DEFAULT_NOTIF_PREFS.soundEnabled);
   const [notifHour, setNotifHour] = useState(DEFAULT_NOTIF_PREFS.hour);
   const [notifMinute, setNotifMinute] = useState(DEFAULT_NOTIF_PREFS.minute);
   const [notifFrequency, setNotifFrequency] = useState<NotifFrequency>(DEFAULT_NOTIF_PREFS.frequency);
@@ -399,6 +401,7 @@ export default function ProfileScreen() {
       try {
         const prefs = await loadNotifPrefs();
         setNotifEnabled(prefs.enabled);
+        setNotifSoundEnabled(prefs.soundEnabled);
         setNotifHour(prefs.hour);
         setNotifMinute(prefs.minute);
         setNotifFrequency(prefs.frequency);
@@ -684,6 +687,7 @@ export default function ProfileScreen() {
     try {
       await saveNotifPrefs({
         enabled: notifEnabled,
+        soundEnabled: notifSoundEnabled,
         hour: notifHour,
         minute: notifMinute,
         frequency: notifFrequency,
@@ -695,7 +699,7 @@ export default function ProfileScreen() {
       console.log('Save notif prefs failed:', e);
       toast.info('Could not save preferences.');
     }
-  }, [notifEnabled, notifHour, notifMinute, notifFrequency, toast]);
+  }, [notifEnabled, notifSoundEnabled, notifHour, notifMinute, notifFrequency, toast]);
 
   const handleTwoPlayerInfo = useCallback(() => {
     alert({
@@ -787,6 +791,8 @@ export default function ProfileScreen() {
               </View>
             )}
           </GlassCard>
+
+          <AdMobNativeAd placement="profile_after_profile_card" />
 
           <View style={styles.statsRow}>
             <GlassCard style={styles.statCard}>
@@ -1027,6 +1033,22 @@ export default function ProfileScreen() {
                 </View>
                 <View style={[styles.notifToggle, notifEnabled && styles.notifToggleActive]}>
                   <View style={[styles.notifToggleKnob, { alignSelf: notifEnabled ? 'flex-end' : 'flex-start' }]} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.notifEnableRow}
+                onPress={() => { setNotifSoundEnabled((v) => !v); void Haptics.selectionAsync(); }}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.notifEnableLabel}>Notification sound</Text>
+                  <Text style={styles.notifEnableHint}>
+                    {notifSoundEnabled ? 'Play a soft ping when a new in-app notification arrives.' : 'Notifications stay silent.'}
+                  </Text>
+                </View>
+                <View style={[styles.notifToggle, notifSoundEnabled && styles.notifToggleActive]}>
+                  <View style={[styles.notifToggleKnob, { alignSelf: notifSoundEnabled ? 'flex-end' : 'flex-start' }]} />
                 </View>
               </TouchableOpacity>
 

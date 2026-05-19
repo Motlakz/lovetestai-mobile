@@ -3,6 +3,7 @@ import {
   markFeedbackSubmitted,
   recordFeedbackEligibleUse,
 } from '@/services/feedback';
+import { trackFeedback } from '@/services/analytics';
 
 interface FeedbackState {
   visible: boolean;
@@ -19,7 +20,10 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
 
   openManual: (source = 'manual') => set({ visible: true, source }),
 
-  close: () => set({ visible: false }),
+  close: () => {
+    trackFeedback('dismissed', { source: get().source });
+    set({ visible: false });
+  },
 
   recordUse: async (source) => {
     const shouldPrompt = await recordFeedbackEligibleUse(source);

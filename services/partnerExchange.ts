@@ -15,6 +15,7 @@ import { decryptText, derivePairKey, encryptText, isEncrypted } from '@/services
 import { usePartnerStore } from '@/store/partnerStore';
 import { useAuthStore } from '@/store/authStore';
 import { useInboxStore } from '@/store/inboxStore';
+import { trackCrud, trackShare } from '@/services/analytics';
 
 export type ExchangeResponse = {
   displayName?: string | null;
@@ -44,12 +45,8 @@ async function pairKey(pairId: string): Promise<Uint8Array> {
 }
 
 async function encryptIfPossible(pairId: string, plaintext: string): Promise<string> {
-  try {
-    const key = await pairKey(pairId);
-    return await encryptText(plaintext, key);
-  } catch {
-    return plaintext;
-  }
+  const key = await pairKey(pairId);
+  return await encryptText(plaintext, key);
 }
 
 async function decryptIfNeeded(pairId: string, value: string | undefined): Promise<string | undefined> {
@@ -143,6 +140,8 @@ export async function sharePartnerPrompt(params: {
     },
     { merge: true },
   );
+  trackShare('partner_prompt', 'partner_mode', 'success');
+  trackCrud('partner_exchange', 'create', { kind: 'prompt' });
 }
 
 export type PartnerShareKind = 'test-result' | 'creation';
@@ -183,6 +182,8 @@ export async function sharePartnerItem(params: {
     senderName: params.senderName,
     createdAt: serverTimestamp(),
   });
+  trackShare(params.kind, 'partner_mode', 'success');
+  trackCrud('partner_share', 'create', { kind: params.kind, has_score: params.score != null });
 }
 
 export function subscribeToPartnerShares(
@@ -249,4 +250,6 @@ export async function sharePartnerReflection(params: {
     },
     { merge: true },
   );
+  trackShare('partner_reflection', 'partner_mode', 'success');
+  trackCrud('partner_exchange', 'update', { kind: 'reflection' });
 }

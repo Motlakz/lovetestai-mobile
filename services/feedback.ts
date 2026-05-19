@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { firestore } from '@/services/firebase';
+import { trackFeedback } from '@/services/analytics';
 
 const FEEDBACK_STATE_KEY = 'feedback_prompt_state_v1';
 const FEEDBACK_SESSION_KEY = 'feedback_session_id';
@@ -93,6 +94,12 @@ export async function markFeedbackSubmitted(starRating: number): Promise<void> {
 }
 
 export async function submitInternalFeedback(data: InternalFeedbackData): Promise<string> {
+  trackFeedback('submitted', {
+    source: data.source,
+    star_rating: data.starRating,
+    has_comments: data.comments.trim().length > 0,
+    signed_in: !!data.accountId,
+  });
   const sessionId = await getFeedbackSessionId();
   const payload = {
     calculatorType: data.source,

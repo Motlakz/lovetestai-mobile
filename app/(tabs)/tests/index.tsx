@@ -42,6 +42,9 @@ import {
   findSoulmate,
   analyzeLoveCompatibility,
 } from '@/services/aiService';
+import { showInterstitialAd } from '@/services/adMob';
+import { usePromoStore } from '@/store/promoStore';
+import { playScoreSound, playUiSound } from '@/services/sounds';
 
 type ScreenState = 'list' | 'quiz' | 'll-result' | 'calculator' | 'lq-questions' | 'calc-result';
 
@@ -121,6 +124,7 @@ export default function TestsScreen() {
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { incrementTests, profile, saveCreation } = useApp();
+  const recordPromoCompletion = usePromoStore((s) => s.recordCompletion);
   const toast = useToast();
   const account = useAuthStore((s) => s.account);
   const partnerLink = usePartnerStore((s) => s.link);
@@ -153,6 +157,7 @@ export default function TestsScreen() {
 
   const startLLQuiz = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void playUiSound('next');
     setCurrentQuestion(0);
     setAnswers({});
     setSelectedAnswer('');
@@ -162,6 +167,7 @@ export default function TestsScreen() {
 
   const startCalculator = useCallback((test: CalculatorTest) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void playUiSound('next');
     setActiveCalcTest(test);
     setCalcInput1('');
     setCalcInput2('');
@@ -212,19 +218,25 @@ export default function TestsScreen() {
     }
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void playUiSound('submit');
     setCalcLoading(true);
     try {
+      let resultScore: number | null = null;
       if (calculatorType === 'zodiac') {
         const data = await calculateZodiacCompatibility(calcInput1, calcInput2);
+        resultScore = data.score;
         setCalcResult({ score: data.score, text: data.analysis });
       } else if (calculatorType === 'birthdate') {
         const data = await calculateBirthdateCompatibility(calcInput1, calcInput2);
+        resultScore = data.score;
         setCalcResult({ score: data.score, text: data.analysis });
       } else if (calculatorType === 'love-score') {
         const data = await calculateLoveScore(calcInput1, calcInput2, calcInput4 || 'Dating', calcInput3);
+        resultScore = data.score;
         setCalcResult({ score: data.score, text: `${data.insight}\n\n${data.message}` });
       } else if (calculatorType === 'numerology') {
         const data = await calculateNumerology(calcInput1, calcInput2, calcInput3, calcInput4);
+        resultScore = data.score;
         setCalcResult({ score: data.score, text: data.analysis });
       } else if (calculatorType === 'soulmate') {
         const data = await findSoulmate({
@@ -237,22 +249,27 @@ export default function TestsScreen() {
         setCalcResult({ text: `${data.analysis}\n\n${data.traits.map(t => `• ${t}`).join('\n')}` });
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      playScoreSound(resultScore);
       setScreenState('calc-result');
+      void showInterstitialAd(`test_completed_${calculatorType}`);
+      void recordPromoCompletion(`test_completed_${calculatorType}`);
     } catch {
       toast.error('Could not connect. Check your connection and try again.');
     } finally {
       setCalcLoading(false);
     }
-  }, [activeCalcTest, calcInput1, calcInput2, calcInput3, calcInput4, soulmateInterests, toast]);
+  }, [activeCalcTest, calcInput1, calcInput2, calcInput3, calcInput4, soulmateInterests, toast, recordPromoCompletion]);
 
   const handleAnswer = useCallback((answerId: string) => {
     void Haptics.selectionAsync();
+    void playUiSound('optionSelect');
     setSelectedAnswer(answerId);
   }, []);
 
   const handleNext = useCallback(() => {
     if (!selectedAnswer) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void playUiSound('next');
     const question = LOVE_LANGUAGE_QUESTIONS[currentQuestion];
     const answer = question.answers.find(a => a.id === selectedAnswer);
     if (!answer) return;
@@ -275,6 +292,9 @@ export default function TestsScreen() {
       setScreenState('ll-result');
       incrementTests();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void playUiSound('highScore');
+      void showInterstitialAd('test_completed_love_language');
+      void recordPromoCompletion('test_completed_love_language');
       resultBounceAnim.setValue(0);
       resultOpacityAnim.setValue(0);
       Animated.parallel([
@@ -282,7 +302,7 @@ export default function TestsScreen() {
         Animated.timing(resultOpacityAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
       ]).start();
     }
-  }, [currentQuestion, selectedAnswer, answers, incrementTests, resultBounceAnim, resultOpacityAnim]);
+  }, [currentQuestion, selectedAnswer, answers, incrementTests, recordPromoCompletion, resultBounceAnim, resultOpacityAnim]);
 
   const handleBack = useCallback(() => {
     setScreenState('list');
@@ -386,6 +406,7 @@ export default function TestsScreen() {
 
   const handleLQAnswer = useCallback(async (score: number) => {
     void Haptics.selectionAsync();
+    void playUiSound('optionSelect');
     const newAnswers = [...lqAnswers, score];
     const newCompat = Math.min(100, Math.max(0, lqCompatibility + (score - 3) * 5));
     setLqCompatibility(newCompat);
@@ -401,16 +422,20 @@ export default function TestsScreen() {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const data = await analyzeLoveCompatibility(calcInput1, calcInput2, calcInput3, calcInput4, finalScore);
         setCalcResult({ score: data.adjustedScore, text: data.result });
+        playScoreSound(data.adjustedScore);
         incrementTests();
       } catch {
         setCalcResult({ score: finalScore, text: 'Could not get a reading right now. Your score reflects the quiz answers directly.' });
+        playScoreSound(finalScore);
         incrementTests();
       } finally {
         setCalcLoading(false);
         setScreenState('calc-result');
+        void showInterstitialAd('test_completed_love_quiz');
+        void recordPromoCompletion('test_completed_love_quiz');
       }
     }
-  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests]);
+  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests, recordPromoCompletion]);
 
   // ── Quiz screen ──────────────────────────────────────────────────────────────
   if (screenState === 'quiz') {

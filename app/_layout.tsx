@@ -28,9 +28,11 @@ import { claimDailyPromptSlot } from "@/services/notifications";
 import { AppAlertProvider } from "@/components/ui/AppAlertModal";
 import { AuthGateProvider } from "@/components/auth/AuthGateModal";
 import FeedbackProvider from "@/components/ui/FeedbackProvider";
+import InAppPromoModal from "@/components/promos/InAppPromoModal";
 import { useAuthStore } from "@/store/authStore";
 import { usePartnerStore } from "@/store/partnerStore";
 import { useInboxStore } from "@/store/inboxStore";
+import { trackScreen } from "@/services/analytics";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -97,6 +99,10 @@ function RootLayoutNav() {
     }
   }, [onboardingComplete, isLoading, fontsLoaded, segments, router]);
 
+  useEffect(() => {
+    trackScreen(segments.join('/') || 'root');
+  }, [segments]);
+
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -124,6 +130,7 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
+      <InAppPromoModal />
     </>
   );
 }

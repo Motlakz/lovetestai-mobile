@@ -13,6 +13,7 @@ import { PartnerLink, loadPartnerLink, persistPartnerLink } from '@/services/db'
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import { useInboxStore } from '@/store/inboxStore';
+import { trackCrud, trackEvent } from '@/services/analytics';
 
 interface PartnerState {
   isLoading: boolean;
@@ -55,6 +56,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
   init: async () => {
     try {
       const stored = await loadPartnerLink();
+      trackCrud('partner_link', 'read', { paired: !!stored?.pairId });
       set({ link: stored, isLoading: false });
       get().subscribeToPair();
     } catch (e) {
@@ -113,6 +115,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
     };
     set({ link });
     await persistPartnerLink(link);
+    trackCrud('partner_invite', 'create');
 
     if (firestore && account) {
       const db = firestore;
@@ -150,6 +153,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
 
     set({ link: null });
     await persistPartnerLink(null);
+    trackCrud('partner_invite', 'delete');
     return get().ensureInviteCode();
   },
 
@@ -237,6 +241,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
     };
     set({ link: next });
     await persistPartnerLink(next);
+    trackEvent('partner_pair_accepted', { has_pair_id: !!pairId });
     if (pairId) {
       void useInboxStore.getState().push({
         kind: 'partner_paired',
@@ -258,6 +263,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
 
     set({ link: null });
     await persistPartnerLink(null);
+    trackCrud('partner_link', 'delete');
 
     if (firestore && account && current.pairId) {
       try {

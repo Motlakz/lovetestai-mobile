@@ -28,6 +28,7 @@ import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
 import SectionTitle from '@/components/ui/SectionTitle';
 import HeartParticles from '@/components/ui/HeartParticles';
+import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
 import { useApp } from '@/context/AppContext';
 import { DAILY_PROMPTS, PROMPT_CATEGORIES } from '@/mocks/tests';
 import { useToast } from '@/components/ui/Toast';
@@ -479,6 +480,8 @@ export default function DailyScreen() {
         </View>
       </GlassCard>
 
+      <AdMobNativeAd placement="daily_after_streak" />
+
       <GlassCard style={styles.promptCard}>
         <GoldBadge label="TODAY'S PROMPT" />
         <GoldDivider />
@@ -508,6 +511,8 @@ export default function DailyScreen() {
           </View>
         )}
       </GlassCard>
+
+      <AdMobNativeAd placement="daily_before_reflections" />
 
       {journalEntries.length > 0 && (
         <>
