@@ -26,6 +26,8 @@ function withAdMobAndroid(config, options = {}) {
 
   config = withAndroidManifest(config, (modConfig) => {
     AndroidConfig.Permissions.addPermission(modConfig.modResults, AD_ID_PERMISSION);
+    modConfig.modResults.manifest.$ = modConfig.modResults.manifest.$ || {};
+    modConfig.modResults.manifest.$['xmlns:tools'] = modConfig.modResults.manifest.$['xmlns:tools'] || 'http://schemas.android.com/tools';
 
     const application = modConfig.modResults.manifest.application?.[0];
     if (application) {
@@ -35,6 +37,7 @@ function withAdMobAndroid(config, options = {}) {
       const attrs = {
         'android:name': ADMOB_METADATA_NAME,
         'android:value': '@string/admob_app_id',
+        'tools:replace': 'android:value',
       };
 
       if (existing) {
