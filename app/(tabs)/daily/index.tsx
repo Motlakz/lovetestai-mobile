@@ -73,7 +73,7 @@ function formatRelativeDate(dateStr: string): string {
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     greetingSection: { paddingVertical: spacing.lg },
     greeting: { fontSize: fontSizes.md, color: c.text_secondary, fontWeight: '500' as const },
     dateText: { fontSize: fontSizes.sm, color: c.text_muted, letterSpacing: 1.5, textTransform: 'uppercase' as const, marginTop: spacing.xs },
@@ -623,13 +623,12 @@ export default function DailyScreen() {
         <GoldBadge label="PARTNER PROMPT" />
         <GoldDivider />
         <Text style={styles.promptText}>{todayPrompt.text}</Text>
-        <Text style={styles.promptMeta}>{todayPrompt.category.toUpperCase()} Â· SHARED EXCHANGE</Text>
+        <Text style={styles.promptMeta}>{todayPrompt.category.toUpperCase()} · SHARED EXCHANGE</Text>
         <View style={styles.promptActions}>
           <GradientButton
             label={partnerLink?.pairId ? 'Share prompt' : 'Pair first'}
             onPress={() => handleSharePartnerPrompt({ text: todayPrompt.text, category: todayPrompt.category })}
           />
-          <GhostButton label="Open Partner Mode" onPress={() => router.push('/(tabs)/partner' as any)} />
         </View>
       </GlassCard>
 
@@ -697,10 +696,10 @@ export default function DailyScreen() {
           onRequestClose={closePromptDetail}
         >
           <Pressable style={styles.modalBackdrop} onPress={closePromptDetail}>
-            <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.xl }]} onPress={(e) => e.stopPropagation()}>
               <View style={styles.modalHandle} />
               {detailPrompt && (
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.lg }}>
                   <Text style={styles.modalCategory}>{detailPrompt.category}</Text>
                   <Text style={styles.modalPrompt}>{detailPrompt.text}</Text>
 

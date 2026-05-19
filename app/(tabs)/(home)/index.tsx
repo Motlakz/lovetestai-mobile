@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useState } from 'react';
+import React, { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,9 +22,10 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import { useApp } from '@/context/AppContext';
 import { useInboxStore, unreadCount } from '@/store/inboxStore';
 import InboxModal from '@/components/ui/InboxModal';
+import { trackEvent, trackGeneratorOpened, trackScreen } from '@/services/analytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - spacing.xl * 2 - spacing.md) / 2;
+const CARD_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - spacing.md) / 2;
 
 interface FeatureCard {
   id: string;
@@ -39,7 +40,7 @@ interface FeatureCard {
 function createStyles(c: ThemeColors, _s: ThemeShadows) {
   return StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     headerRow: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const, paddingTop: spacing.md, gap: spacing.md },
     headerGreeting: { flex: 1, fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, flexWrap: 'wrap' as const, lineHeight: fontSizes['2xl'] * 1.2 },
     headerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1, borderColor: c.glass_border, backgroundColor: c.glass_fill, position: 'relative' as const },
@@ -82,8 +83,14 @@ export default function HomeScreen() {
     { id: 'love-quote', icon: 'text-outline', label: 'Love Quote', description: 'Generate a shareable quote', gradient: [colors.grad_gold_start, colors.grad_gold_end], route: '/create-mode?tool=love-quote' },
   ], [colors]);
 
+  useEffect(() => {
+    trackScreen('home', { generator_count: FEATURES.length });
+  }, [FEATURES.length]);
+
   const handleFeaturePress = useCallback((feature: FeatureCard) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackGeneratorOpened(feature.id);
+    trackEvent('home_generator_selected', { generator_type: feature.id });
     if (feature.route) router.push(feature.route as any);
   }, [router]);
 
@@ -113,7 +120,7 @@ export default function HomeScreen() {
               {greeting}{profile.name ? `, ${profile.name}` : ''}
             </Text>
             <TouchableOpacity
-              onPress={() => { void Haptics.selectionAsync(); setInboxOpen(true); }}
+              onPress={() => { void Haptics.selectionAsync(); trackEvent('home_inbox_opened', { unread_count: unread }); setInboxOpen(true); }}
               style={styles.headerIconBtn}
               accessibilityLabel="Notifications"
             >
@@ -159,14 +166,14 @@ export default function HomeScreen() {
 
           <SectionTitle title="Quick Actions" />
           <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/tests' as any); }} activeOpacity={0.8}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); trackEvent('home_quick_action', { action: 'tests' }); router.push('/(tabs)/tests' as any); }} activeOpacity={0.8}>
               <GlassCard style={styles.quickAction}>
                 <Ionicons name="heart-outline" size={18} color={colors.accent_rose} />
                 <Text style={styles.quickActionLabel}>Take Love Test</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.text_muted} />
               </GlassCard>
             </TouchableOpacity>
-            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); router.push('/(tabs)/daily' as any); }} activeOpacity={0.8}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => { void Haptics.selectionAsync(); trackEvent('home_quick_action', { action: 'daily_prompt' }); router.push('/(tabs)/daily' as any); }} activeOpacity={0.8}>
               <GlassCard style={styles.quickAction}>
                 <Ionicons name="calendar-outline" size={18} color={colors.accent_violet} />
                 <Text style={styles.quickActionLabel}>Daily Prompt</Text>
@@ -178,6 +185,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              trackEvent('home_quick_action', { action: 'partner_prompts' });
               router.push('/(tabs)/partner' as any);
             }}
             activeOpacity={0.8}

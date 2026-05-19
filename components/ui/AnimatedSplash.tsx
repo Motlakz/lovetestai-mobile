@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import Svg, { Path, Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -369,16 +370,22 @@ export default function AnimatedSplash({ onFinish }: Props) {
     outputRange: ['-15deg', '5deg', '0deg'],
   });
 
-  // Orbs travel along intersecting paths and recoil at the midpoint of the loop,
-  // so they appear to bounce off each other instead of drifting in unison.
+  // Orbs sit on diagonally mirrored paths around the screen center and converge
+  // toward the heart at the midpoint of the loop, giving a clean paired bounce.
+  const ORB_SIZE = 240;
+  const ORB_HALF = ORB_SIZE / 2;
+
+  // Centers (mirrored across W/2, H/2):
+  //   orb1: (0.20W, 0.22H) -> (0.42W, 0.46H)
+  //   orb2: (0.80W, 0.78H) -> (0.58W, 0.54H)
   const orb1Top = bgGrad1.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [H * 0.12, H * 0.38, H * 0.12],
+    outputRange: [H * 0.22 - ORB_HALF, H * 0.46 - ORB_HALF, H * 0.22 - ORB_HALF],
   });
 
   const orb1Left = bgGrad1.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [W * 0.05, W * 0.42, W * 0.05],
+    outputRange: [W * 0.20 - ORB_HALF, W * 0.42 - ORB_HALF, W * 0.20 - ORB_HALF],
   });
 
   const orb1Scale = bgGrad1.interpolate({
@@ -388,12 +395,12 @@ export default function AnimatedSplash({ onFinish }: Props) {
 
   const orb2Top = bgGrad2.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [H * 0.72, H * 0.42, H * 0.72],
+    outputRange: [H * 0.78 - ORB_HALF, H * 0.54 - ORB_HALF, H * 0.78 - ORB_HALF],
   });
 
   const orb2Left = bgGrad2.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [W * 0.62, W * 0.28, W * 0.62],
+    outputRange: [W * 0.80 - ORB_HALF, W * 0.58 - ORB_HALF, W * 0.80 - ORB_HALF],
   });
 
   const orb2Scale = bgGrad2.interpolate({
@@ -411,10 +418,10 @@ export default function AnimatedSplash({ onFinish }: Props) {
           {
             top: orb1Top,
             left: orb1Left,
-            backgroundColor: isDark ? 'rgba(255,61,127,0.12)' : 'rgba(255,61,127,0.08)',
-            width: 260,
-            height: 260,
-            borderRadius: 130,
+            backgroundColor: isDark ? 'rgba(255,61,127,0.55)' : 'rgba(255,61,127,0.38)',
+            width: ORB_SIZE,
+            height: ORB_SIZE,
+            borderRadius: ORB_HALF,
             transform: [{ scale: orb1Scale }],
           },
         ]}
@@ -425,14 +432,21 @@ export default function AnimatedSplash({ onFinish }: Props) {
           {
             top: orb2Top,
             left: orb2Left,
-            backgroundColor: isDark ? 'rgba(180,79,255,0.10)' : 'rgba(142,36,170,0.06)',
-            width: 200,
-            height: 200,
-            borderRadius: 100,
+            backgroundColor: isDark ? 'rgba(180,79,255,0.50)' : 'rgba(142,36,170,0.32)',
+            width: ORB_SIZE,
+            height: ORB_SIZE,
+            borderRadius: ORB_HALF,
             transform: [{ scale: orb2Scale }],
           },
         ]}
       />
+
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 60 : 80}
+        tint={isDark ? 'dark' : 'light'}
+        style={styles.frost}
+      />
+      <View style={[styles.frostTint, { backgroundColor: isDark ? 'rgba(13,6,16,0.18)' : 'rgba(254,246,248,0.30)' }]} />
 
       <Animated.View
         style={[
@@ -687,9 +701,15 @@ const styles = StyleSheet.create({
   orb: {
     position: 'absolute',
     ...(Platform.OS === 'web'
-      ? { filter: 'blur(60px)' }
+      ? { filter: 'blur(40px)' }
       : {}),
   } as any,
+  frost: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  frostTint: {
+    ...StyleSheet.absoluteFillObject,
+  },
   glowCircle: {
     position: 'absolute',
     top: H / 2 - 160,

@@ -63,6 +63,13 @@ import {
   getTemplatesForTool,
   type CreationTemplateId,
 } from '@/services/creationTemplates';
+import {
+  trackEvent,
+  trackGeneratorOpened,
+  trackGeneratorFailed,
+  trackShare,
+  trackScreen,
+} from '@/services/analytics';
 
 const TOOL_META: Record<string, { title: string; icon: string; subtitle: string; cta: string }> = {
   'love-letter': { title: 'Love Letter', icon: 'mail-outline', subtitle: 'Write a heartfelt, deeply personal letter', cta: 'Write the Letter' },
@@ -202,7 +209,7 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
 export default function CreateModeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { tool } = useLocalSearchParams<{ tool: string }>();
+  const { tool, content: preloadContent, toName: preloadToName, autoExport } = useLocalSearchParams<{ tool: string; content?: string; toName?: string; autoExport?: string }>();
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { saveCreation, profile } = useApp();
@@ -245,6 +252,23 @@ export default function CreateModeScreen() {
     setSelectedTemplateId(defaultTemplate.id);
   }, [defaultTemplate.id]);
 
+  useEffect(() => {
+    trackScreen('create_mode', { generator_type: selectedTool });
+    trackGeneratorOpened(selectedTool);
+  }, [selectedTool]);
+
+  useEffect(() => {
+    if (preloadContent) {
+      setResult(preloadContent);
+      setShowResult(true);
+      resultAnim.setValue(1);
+    }
+    if (preloadToName) setToName(preloadToName);
+    if (autoExport === '1' && preloadContent) {
+      setShowExportSheet(true);
+    }
+  }, [preloadContent, preloadToName, autoExport, resultAnim]);
+
   const handleGenerate = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
@@ -267,6 +291,7 @@ export default function CreateModeScreen() {
       setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 300);
     } catch (error) {
       console.log('Generation error:', error);
+      trackGeneratorFailed(selectedTool, 'create_mode_error');
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -281,7 +306,8 @@ export default function CreateModeScreen() {
       await Clipboard.setStringAsync(result);
     }
     toast.success('Content copied to clipboard');
-  }, [result, toast]);
+    trackEvent('generator_content_copied', { generator_type: selectedTool, content_type: 'text' });
+  }, [result, selectedTool, toast]);
 
   const handleSave = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -310,6 +336,7 @@ export default function CreateModeScreen() {
       templateName: selectedTemplate.name,
     });
     try {
+      trackShare('creation_text', 'native', 'started');
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.share) {
           await navigator.share({ title: meta.title, text: shareText });
@@ -320,8 +347,14 @@ export default function CreateModeScreen() {
       } else {
         await Share.share({ message: shareText, title: meta.title });
       }
+      trackShare('creation_text', 'native', 'success');
     } catch (error: any) {
-      if (error?.message !== 'User did not share') console.log('Share error:', error);
+      if (error?.message !== 'User did not share') {
+        trackShare('creation_text', 'native', 'failed');
+        console.log('Share error:', error);
+      } else {
+        trackShare('creation_text', 'native', 'cancelled');
+      }
     }
     setShowExportSheet(false);
   }, [result, meta.title, selectedTemplate.name, toast, toName]);
@@ -340,13 +373,19 @@ export default function CreateModeScreen() {
       const supported = Platform.OS !== 'web' && await Linking.canOpenURL(url);
       if (supported) {
         await Linking.openURL(url);
+        trackShare('creation_text', 'whatsapp', 'success');
       } else if (Platform.OS === 'web') {
         await Linking.openURL(`https://wa.me/?text=${encoded}`);
+        trackShare('creation_text', 'whatsapp_web', 'success');
       } else {
         await Clipboard.setStringAsync(shareText);
+        trackShare('creation_text', 'whatsapp_copy_fallback', 'success');
         alert({ title: 'WhatsApp not found', message: 'Text copied to clipboard instead.', icon: 'logo-whatsapp' });
       }
-    } catch (error) { console.log('WhatsApp share error:', error); }
+    } catch (error) {
+      trackShare('creation_text', 'whatsapp', 'failed');
+      console.log('WhatsApp share error:', error);
+    }
     setShowExportSheet(false);
   }, [result, meta.title, alert, selectedTemplate.name, toName]);
 
@@ -382,9 +421,11 @@ export default function CreateModeScreen() {
         senderName: profile.name?.trim() || account.displayName || account.email || null,
       });
       toast.success('Sent to your partner.');
+      trackShare('creation', 'partner_mode', 'success');
       setShowExportSheet(false);
     } catch (e) {
       console.log('partner creation share failed:', e);
+      trackShare('creation', 'partner_mode', 'failed');
       toast.error('Could not send to partner.');
     }
   }, [account, meta.title, partnerLink, profile.name, result, router, toName, toast]);
@@ -411,12 +452,15 @@ export default function CreateModeScreen() {
           dialogTitle: `Share ${meta.title}`,
           UTI: 'public.png',
         });
+        trackShare('creation_image', 'native_image', 'success');
       } else {
         toast.info('Image sharing is not available on this device.');
+        trackShare('creation_image', 'native_image', 'failed');
       }
       setShowExportSheet(false);
     } catch (error) {
       console.log('Snapshot share failed:', error);
+      trackShare('creation_image', 'native_image', 'failed');
       toast.error('Could not create the image export.');
     }
   }, [captureTemplateImage, meta.title, toast]);
@@ -443,6 +487,7 @@ export default function CreateModeScreen() {
         await MediaLibrary.saveToLibraryAsync(uri);
       }
       toast.success('Image saved to your gallery.');
+      trackEvent('generator_download', { generator_type: selectedTool, format: 'png', content_type: 'image' });
       setShowExportSheet(false);
     } catch (error) {
       console.log('Snapshot save failed:', error);
@@ -645,6 +690,7 @@ export default function CreateModeScreen() {
                         key={template.id}
                         onPress={() => {
                           setSelectedTemplateId(template.id);
+                          trackEvent('generator_template_selected', { generator_type: selectedTool, template_id: template.id });
                           void Haptics.selectionAsync();
                         }}
                         activeOpacity={0.85}

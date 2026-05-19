@@ -606,7 +606,7 @@ export default function PartnerLiteScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: spacing.xl, gap: spacing.lg },
+  scroll: { paddingHorizontal: spacing.lg, gap: spacing.lg },
   header: { alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
   title: { fontSize: fontSizes['2xl'], fontWeight: '700', textAlign: 'center' },
   subtitle: { fontSize: fontSizes.sm, textAlign: 'center', lineHeight: 20, maxWidth: 320 },

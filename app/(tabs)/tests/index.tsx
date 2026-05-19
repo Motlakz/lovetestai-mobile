@@ -25,6 +25,7 @@ import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
 import ProgressBar from '@/components/ui/ProgressBar';
 import HeartParticles from '@/components/ui/HeartParticles';
+import RichText from '@/components/ui/RichText';
 import SelectField from '@/components/ui/SelectField';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { ALL_TESTS, LOVE_LANGUAGE_QUESTIONS, LOVE_LANGUAGE_RESULTS, ATTACHMENT_STYLES, LL_TO_ATTACHMENT, LOVE_QUIZ_QUESTIONS, LQ_ANSWER_CHOICES, CalculatorTest, LLResult, AttachmentStyle, LQQuestion } from '@/mocks/tests';
@@ -44,9 +45,6 @@ import {
 
 type ScreenState = 'list' | 'quiz' | 'll-result' | 'calculator' | 'lq-questions' | 'calc-result';
 
-const DIFFICULTY_MAP: Record<string, number> = { '1 min': 1, '2 min': 2, '3 min': 3, '4 min': 3, '5 min': 3 };
-const DIFFICULTY_COLORS = ['#4ECDC4', '#FFD166', '#FF6B8A'];
-
 const ZODIAC_SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 const RELATIONSHIP_STATUSES = ['Single (Crushing)', 'Dating', 'In a Relationship', 'Engaged', 'Married'];
 const LOVE_LANGUAGES = ['Words of Affirmation', 'Physical Touch', 'Quality Time', 'Receiving Gifts', 'Acts of Service'];
@@ -55,10 +53,10 @@ const INTEREST_OPTIONS = ['Travel', 'Music', 'Art', 'Fitness', 'Cooking', 'Readi
 function createStyles(c: ThemeColors, s: ThemeShadows) {
   return StyleSheet.create({
     container: { flex: 1 },
-    header: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+    header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
     headerSub: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const, marginTop: spacing.xs },
-    listContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     featuredCard: { padding: spacing.xl, marginBottom: spacing.lg, minHeight: 130, justifyContent: 'center' as const, gap: spacing.sm },
     featuredTitle: { fontSize: fontSizes.xl, color: c.text_primary, fontWeight: '700' as const },
     featuredDetail: { fontSize: fontSizes.sm, color: c.text_secondary },
@@ -66,21 +64,19 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     testCard: { padding: 0, flexDirection: 'row' as const, alignItems: 'stretch' as const, marginBottom: spacing.md, minHeight: 124, overflow: 'hidden' as const },
     testCardStrip: { width: 68, alignItems: 'center' as const, justifyContent: 'center' as const, gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: 4 },
     testStripDuration: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' as const, letterSpacing: 1 },
-    testCardBody: { flex: 1, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.xs, justifyContent: 'space-between' as const },
+    testCardBody: { flex: 1, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.xs },
     testCardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: spacing.sm },
     testCardTitle: { fontSize: fontSizes.md, color: c.text_primary, fontWeight: '700' as const, flex: 1 },
     testCardDesc: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 18 },
-    testCardCta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, alignSelf: 'flex-end' as const, marginTop: spacing.xs },
+    testCardCta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, alignSelf: 'flex-end' as const, marginTop: 'auto' as const },
     testCardCtaText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 0.8, textTransform: 'uppercase' as const },
-    difficultyDots: { flexDirection: 'row' as const, gap: 3 },
-    difficultyDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: c.glass_border },
     completedBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
     completedText: { fontSize: fontSizes.xs, color: c.success },
-    quizHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: spacing.md },
+    quizHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.md },
     backBtn: { padding: spacing.xs },
     quizProgress: { fontSize: fontSizes.xs, color: c.text_muted, letterSpacing: 1.5, textTransform: 'uppercase' as const },
-    progressContainer: { paddingHorizontal: spacing.xl, marginBottom: spacing.xl },
-    quizContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    progressContainer: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
+    quizContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     questionText: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '600' as const, textAlign: 'center' as const, marginBottom: spacing['2xl'], lineHeight: 38 },
     answersContainer: { gap: spacing.md, marginBottom: spacing.xl },
     answerCard: { padding: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },
@@ -88,7 +84,7 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     answerText: { color: c.text_secondary, fontSize: fontSizes.base, flex: 1, marginRight: spacing.sm },
     answerTextSelected: { color: c.text_primary, fontWeight: '500' as const },
     nextBtn: { alignSelf: 'center' as const },
-    resultContent: { paddingHorizontal: spacing.xl, paddingTop: spacing['2xl'], paddingBottom: spacing.md, alignItems: 'center' as const },
+    resultContent: { paddingHorizontal: spacing.lg, paddingTop: spacing['2xl'], paddingBottom: spacing.md, alignItems: 'center' as const },
     resultIconContainer: { marginBottom: spacing.xl },
     resultIconGradient: { width: 100, height: 100, borderRadius: 50, alignItems: 'center' as const, justifyContent: 'center' as const },
     resultTitle: { fontSize: fontSizes['3xl'], color: c.text_primary, fontWeight: '700' as const, textAlign: 'center' as const, letterSpacing: -0.5, marginBottom: spacing.sm },
@@ -99,11 +95,11 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
     reportPreview: { color: c.text_secondary, fontSize: fontSizes.base, lineHeight: 24, padding: spacing.xl },
     resultActions: { gap: spacing.md, alignItems: 'center' as const, width: '100%' },
     bottomSpacer: { height: 40 },
-    calcContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    calcContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     calcTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, marginBottom: spacing.xs },
     calcSub: { fontSize: fontSizes.sm, color: c.text_secondary, marginBottom: spacing.xl },
     calcLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const, marginBottom: spacing.sm, marginTop: spacing.md },
-    calcInput: { backgroundColor: c.bg_elevated, borderWidth: 1, borderColor: c.glass_border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, color: c.text_primary, fontSize: fontSizes.base },
+    calcInput: { backgroundColor: c.bg_elevated, borderWidth: 1, borderColor: c.glass_border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, color: c.text_primary, fontSize: fontSizes.base, marginBottom: spacing.md },
     calcResultCard: { padding: spacing.xl, marginBottom: spacing.xl },
     calcScoreRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: spacing.md, marginBottom: spacing.lg },
     calcScoreNum: { fontSize: fontSizes['3xl'], color: c.text_gold, fontWeight: '700' as const },
@@ -388,17 +384,6 @@ export default function TestsScreen() {
     }
   }, []);
 
-  const renderDifficultyDots = useCallback((duration: string) => {
-    const level = DIFFICULTY_MAP[duration] || 1;
-    return (
-      <View style={styles.difficultyDots}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={[styles.difficultyDot, i < level && { backgroundColor: DIFFICULTY_COLORS[Math.min(level - 1, 2)] }]} />
-        ))}
-      </View>
-    );
-  }, [styles]);
-
   const handleLQAnswer = useCallback(async (score: number) => {
     void Haptics.selectionAsync();
     const newAnswers = [...lqAnswers, score];
@@ -487,7 +472,7 @@ export default function TestsScreen() {
             <Animated.View style={{ opacity: resultOpacityAnim }}>
               <Text style={styles.resultTitle}>{llResult.label}</Text>
               <Text style={styles.resultScore}>Your Primary Love Language</Text>
-              <Text style={styles.resultSummary}>{llResult.summary}</Text>
+              <RichText text={llResult.summary} style={styles.resultSummary} />
             </Animated.View>
             <GoldDivider />
             {attachmentResult && (
@@ -504,7 +489,7 @@ export default function TestsScreen() {
             )}
             <View style={styles.fullReportSection}>
               <View style={styles.lockedReportContainer}>
-                <Text style={styles.reportPreview}>{llResult.fullReport}</Text>
+                <RichText text={llResult.fullReport} style={styles.reportPreview} />
               </View>
             </View>
             <View style={styles.resultActions}>
@@ -700,7 +685,7 @@ export default function TestsScreen() {
             )}
             <GoldDivider />
             <GlassCard style={styles.calcResultCard}>
-              <Text style={styles.calcResultText}>{calcResult.text}</Text>
+              <RichText text={calcResult.text} style={styles.calcResultText} />
             </GlassCard>
             <View style={styles.calcResultActions}>
               <GhostButton label="Save to Profile" onPress={handleSaveCalcResult} />
@@ -759,7 +744,6 @@ export default function TestsScreen() {
                   <View style={styles.testCardBody}>
                     <View style={styles.testCardHeader}>
                       <Text style={styles.testCardTitle} numberOfLines={1}>{test.title}</Text>
-                      {renderDifficultyDots(test.duration)}
                     </View>
                     <Text style={styles.testCardDesc} numberOfLines={2}>{test.description}</Text>
                     <View style={styles.testCardCta}>

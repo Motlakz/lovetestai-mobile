@@ -8,7 +8,6 @@ import {
   Platform,
   Modal,
   TextInput,
-  Linking,
   KeyboardAvoidingView,
   Share,
 } from 'react-native';
@@ -28,6 +27,8 @@ import GoldBadge from '@/components/ui/GoldBadge';
 import GoldDivider from '@/components/ui/GoldDivider';
 import DatePickerField from '@/components/ui/DatePickerField';
 import SectionTitle from '@/components/ui/SectionTitle';
+import LegalSheet from '@/components/ui/LegalSheet';
+import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legalContent';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { useAppAlert } from '@/components/ui/AppAlertModal';
@@ -61,12 +62,19 @@ const TOOL_ICONS: Record<string, string> = {
   'Conversation Starters': 'people-outline',
 };
 
+const TYPE_TO_TOOL: Record<string, string> = {
+  'Love Letter': 'love-letter',
+  'Love Poem': 'love-poem',
+  'Love Note': 'love-note',
+  'Love Quote': 'love-quote',
+};
+
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1 },
-    header: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+    header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
-    scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+    scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     profileCard: { padding: spacing.xl, alignItems: 'center' as const, marginBottom: spacing.lg, gap: spacing.sm },
     avatarContainer: { marginBottom: spacing.sm },
     avatarGradient: { width: 72, height: 72, borderRadius: 36, padding: 3 },
@@ -75,7 +83,7 @@ function createStyles(c: ThemeColors) {
     profileName: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '700' as const },
     profileStatus: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const },
     profileDob: { fontSize: fontSizes.xs, color: c.text_muted },
-    editBtn: { marginTop: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
+    editIconBtn: { position: 'absolute' as const, top: spacing.md, right: spacing.md, padding: spacing.xs, borderRadius: radius.full, backgroundColor: c.glass_fill, borderWidth: 1, borderColor: c.glass_border, zIndex: 2 },
     statsRow: { flexDirection: 'row' as const, gap: spacing.md, marginBottom: spacing.xl },
     statCard: { flex: 1, padding: spacing.lg, alignItems: 'center' as const, gap: spacing.xs },
     statNumber: { fontSize: fontSizes.xl, color: c.text_gold, fontWeight: '700' as const },
@@ -380,6 +388,7 @@ export default function ProfileScreen() {
   const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [viewingCreation, setViewingCreation] = useState<SavedCreation | null>(null);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [notifEnabled, setNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.enabled);
   const [notifHour, setNotifHour] = useState(DEFAULT_NOTIF_PREFS.hour);
   const [notifMinute, setNotifMinute] = useState(DEFAULT_NOTIF_PREFS.minute);
@@ -484,8 +493,17 @@ export default function ProfileScreen() {
     toast.success('Content copied to clipboard');
   }, [toast]);
 
-  const handleShareCreation = useCallback(async (content: string, type: string) => {
+  const handleShareCreation = useCallback(async (content: string, type: string, toName?: string) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const tool = TYPE_TO_TOOL[type];
+    if (tool) {
+      setViewingCreation(null);
+      router.push({
+        pathname: '/create-mode',
+        params: { tool, content, toName: toName ?? '', autoExport: '1' },
+      } as any);
+      return;
+    }
     const shareText = buildViralCreationShareText({ type, content });
     try {
       if (Platform.OS === 'web') {
@@ -503,7 +521,7 @@ export default function ProfileScreen() {
         console.log('Share error:', error);
       }
     }
-  }, [toast]);
+  }, [router, toast]);
 
   const toggleCreationSelection = useCallback((id: string) => {
     setSelectedCreationIds((prev) => (
@@ -648,24 +666,14 @@ export default function ProfileScreen() {
   }, [openManualFeedback]);
 
   const handlePrivacyPolicy = useCallback(() => {
-    Linking.openURL('https://lovetestai.com/privacy-policy').catch(() => {
-      alert({
-        title: 'Privacy Policy',
-        message: 'Could not open the privacy policy. Visit lovetestai.com/privacy-policy from any browser.',
-        icon: 'shield-checkmark-outline',
-      });
-    });
-  }, [alert]);
+    void Haptics.selectionAsync();
+    setLegalDoc(PRIVACY_POLICY);
+  }, []);
 
   const handleTermsOfService = useCallback(() => {
-    Linking.openURL('https://lovetestai.com/terms-of-service').catch(() => {
-      alert({
-        title: 'Terms of Service',
-        message: 'Could not open the terms of service. Visit lovetestai.com/terms-of-service from any browser.',
-        icon: 'document-text-outline',
-      });
-    });
-  }, [alert]);
+    void Haptics.selectionAsync();
+    setLegalDoc(TERMS_OF_SERVICE);
+  }, []);
 
   const handleNotificationPrefs = useCallback(() => {
     void Haptics.selectionAsync();
@@ -739,6 +747,14 @@ export default function ProfileScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <GlassCard style={styles.profileCard}>
+            <TouchableOpacity
+              onPress={handleOpenEditModal}
+              style={styles.editIconBtn}
+              accessibilityLabel="Edit profile"
+              hitSlop={8}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.text_secondary} />
+            </TouchableOpacity>
             <View style={styles.avatarContainer}>
               <LinearGradient
                 colors={[colors.accent_rose, colors.accent_violet]}
@@ -770,7 +786,6 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             )}
-            <GhostButton label="Edit Profile" onPress={handleOpenEditModal} style={styles.editBtn} />
           </GlassCard>
 
           <View style={styles.statsRow}>
@@ -1147,7 +1162,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   style={styles.detailActionBtn}
                   activeOpacity={0.8}
-                  onPress={() => handleShareCreation(viewingCreation.content, viewingCreation.type)}
+                  onPress={() => handleShareCreation(viewingCreation.content, viewingCreation.type, viewingCreation.toName)}
                 >
                   <Ionicons name="share-outline" size={18} color={colors.text_primary} />
                   <Text style={styles.detailActionLabel}>Share</Text>
@@ -1169,6 +1184,8 @@ export default function ProfileScreen() {
           )}
         </View>
       </Modal>
+
+      <LegalSheet visible={!!legalDoc} doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </ScreenBackground>
   );
 }
