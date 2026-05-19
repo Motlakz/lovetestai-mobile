@@ -68,7 +68,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     trackCrud('inbox_item', 'create', { kind: item.kind });
     void loadNotifPrefs()
       .then((prefs) => {
-        if (prefs.enabled && prefs.soundEnabled) void playUiSound('messagePing');
+        if (prefs.inAppEnabled && prefs.soundEnabled) void playUiSound('messagePing');
       })
       .catch(() => undefined);
     try {

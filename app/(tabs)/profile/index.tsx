@@ -390,7 +390,8 @@ export default function ProfileScreen() {
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [viewingCreation, setViewingCreation] = useState<SavedCreation | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.enabled);
+  const [pushNotifEnabled, setPushNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.pushEnabled);
+  const [inAppNotifEnabled, setInAppNotifEnabled] = useState(DEFAULT_NOTIF_PREFS.inAppEnabled);
   const [notifSoundEnabled, setNotifSoundEnabled] = useState(DEFAULT_NOTIF_PREFS.soundEnabled);
   const [notifHour, setNotifHour] = useState(DEFAULT_NOTIF_PREFS.hour);
   const [notifMinute, setNotifMinute] = useState(DEFAULT_NOTIF_PREFS.minute);
@@ -400,7 +401,8 @@ export default function ProfileScreen() {
     void (async () => {
       try {
         const prefs = await loadNotifPrefs();
-        setNotifEnabled(prefs.enabled);
+        setPushNotifEnabled(prefs.pushEnabled);
+        setInAppNotifEnabled(prefs.inAppEnabled);
         setNotifSoundEnabled(prefs.soundEnabled);
         setNotifHour(prefs.hour);
         setNotifMinute(prefs.minute);
@@ -419,6 +421,7 @@ export default function ProfileScreen() {
   }, [params?.notif, router]);
 
   const selectionActive = selectedCreationIds.length > 0;
+  const remindersEnabled = pushNotifEnabled || inAppNotifEnabled;
 
   const initials = (profile.name || 'LT')
     .split(' ')
@@ -678,7 +681,12 @@ export default function ProfileScreen() {
     setLegalDoc(TERMS_OF_SERVICE);
   }, []);
 
-  const handleNotificationPrefs = useCallback(() => {
+  const handlePushNotificationPrefs = useCallback(() => {
+    void Haptics.selectionAsync();
+    setNotifModalVisible(true);
+  }, []);
+
+  const handleInAppNotificationPrefs = useCallback(() => {
     void Haptics.selectionAsync();
     setNotifModalVisible(true);
   }, []);
@@ -686,20 +694,22 @@ export default function ProfileScreen() {
   const handleSaveNotifPrefs = useCallback(async () => {
     try {
       await saveNotifPrefs({
-        enabled: notifEnabled,
+        enabled: pushNotifEnabled || inAppNotifEnabled,
+        pushEnabled: pushNotifEnabled,
+        inAppEnabled: inAppNotifEnabled,
         soundEnabled: notifSoundEnabled,
         hour: notifHour,
         minute: notifMinute,
         frequency: notifFrequency,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.success(notifEnabled ? 'Prompt reminders saved.' : 'Prompt reminders turned off.');
+      toast.success(pushNotifEnabled || inAppNotifEnabled ? 'Notification preferences saved.' : 'Notifications turned off.');
       setNotifModalVisible(false);
     } catch (e) {
       console.log('Save notif prefs failed:', e);
       toast.info('Could not save preferences.');
     }
-  }, [notifEnabled, notifSoundEnabled, notifHour, notifMinute, notifFrequency, toast]);
+  }, [pushNotifEnabled, inAppNotifEnabled, notifSoundEnabled, notifHour, notifMinute, notifFrequency, toast]);
 
   const handleTwoPlayerInfo = useCallback(() => {
     alert({
@@ -900,7 +910,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           {renderSettingsRow('people-outline', 'Partner Prompts', handleTwoPlayerInfo)}
-          {renderSettingsRow('notifications-outline', 'Notification Preferences', handleNotificationPrefs)}
+          {renderSettingsRow('notifications-outline', 'Push Notifications', handlePushNotificationPrefs, pushNotifEnabled ? 'On' : 'Off')}
+          {renderSettingsRow('file-tray-full-outline', 'In-App Notifications', handleInAppNotificationPrefs, inAppNotifEnabled ? 'On' : 'Off')}
           {renderSettingsRow('language-outline', 'Language', handleLanguage, 'Soon')}
           {renderSettingsRow('star-outline', 'Rate Love Test AI', handleRateApp)}
           {renderSettingsRow('shield-outline', 'Privacy Policy', handlePrivacyPolicy)}
@@ -1022,17 +1033,33 @@ export default function ProfileScreen() {
 
               <TouchableOpacity
                 style={styles.notifEnableRow}
-                onPress={() => { setNotifEnabled((v) => !v); void Haptics.selectionAsync(); }}
+                onPress={() => { setPushNotifEnabled((v) => !v); void Haptics.selectionAsync(); }}
                 activeOpacity={0.85}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.notifEnableLabel}>Enable reminders</Text>
+                  <Text style={styles.notifEnableLabel}>Push reminders</Text>
                   <Text style={styles.notifEnableHint}>
-                    {notifEnabled ? 'You will see a gentle in-app nudge on schedule.' : 'Reminders are paused.'}
+                    {pushNotifEnabled ? 'Allow scheduled daily prompt notifications outside the app.' : 'No system push reminders will be sent.'}
                   </Text>
                 </View>
-                <View style={[styles.notifToggle, notifEnabled && styles.notifToggleActive]}>
-                  <View style={[styles.notifToggleKnob, { alignSelf: notifEnabled ? 'flex-end' : 'flex-start' }]} />
+                <View style={[styles.notifToggle, pushNotifEnabled && styles.notifToggleActive]}>
+                  <View style={[styles.notifToggleKnob, { alignSelf: pushNotifEnabled ? 'flex-end' : 'flex-start' }]} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.notifEnableRow}
+                onPress={() => { setInAppNotifEnabled((v) => !v); void Haptics.selectionAsync(); }}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.notifEnableLabel}>In-app reminders</Text>
+                  <Text style={styles.notifEnableHint}>
+                    {inAppNotifEnabled ? 'Show inbox nudges and home alerts while using the app.' : 'In-app notification nudges are paused.'}
+                  </Text>
+                </View>
+                <View style={[styles.notifToggle, inAppNotifEnabled && styles.notifToggleActive]}>
+                  <View style={[styles.notifToggleKnob, { alignSelf: inAppNotifEnabled ? 'flex-end' : 'flex-start' }]} />
                 </View>
               </TouchableOpacity>
 
@@ -1066,11 +1093,11 @@ export default function ProfileScreen() {
                         return (
                           <TouchableOpacity
                             key={t.label}
-                            disabled={!notifEnabled}
+                            disabled={!remindersEnabled}
                             style={[
                               styles.notifTimeCell,
                               active && styles.notifTimeCellActive,
-                              !notifEnabled && styles.notifTimeCellDisabled,
+                              !remindersEnabled && styles.notifTimeCellDisabled,
                             ]}
                             activeOpacity={0.8}
                             onPress={() => {
@@ -1101,11 +1128,11 @@ export default function ProfileScreen() {
                   return (
                     <TouchableOpacity
                       key={f.value}
-                      disabled={!notifEnabled}
+                      disabled={!remindersEnabled}
                       style={[
                         styles.notifFreqChip,
                         active && styles.notifFreqChipActive,
-                        !notifEnabled && styles.notifTimeCellDisabled,
+                        !remindersEnabled && styles.notifTimeCellDisabled,
                       ]}
                       activeOpacity={0.8}
                       onPress={() => { setNotifFrequency(f.value); void Haptics.selectionAsync(); }}
@@ -1121,9 +1148,9 @@ export default function ProfileScreen() {
               <View style={styles.notifSummaryCard}>
                 <Text style={styles.notifSummaryLabel}>Summary</Text>
                 <Text style={styles.notifSummaryValue}>
-                  {notifEnabled
+                  {remindersEnabled
                     ? `${NOTIF_FREQUENCY_OPTIONS.find((f) => f.value === notifFrequency)?.label ?? 'Every day'} · ${NOTIF_TIME_GRID.find((t) => t.hour === notifHour && t.minute === notifMinute)?.label ?? `${String(notifHour).padStart(2, '0')}:${String(notifMinute).padStart(2, '0')}`}`
-                    : 'Reminders off'}
+                    : 'Push and in-app reminders off'}
                 </Text>
               </View>
 

@@ -42,8 +42,7 @@ import {
   findSoulmate,
   analyzeLoveCompatibility,
 } from '@/services/aiService';
-import { showInterstitialAd } from '@/services/adMob';
-import { usePromoStore } from '@/store/promoStore';
+import { showCompletionPlacement } from '@/services/completionPlacement';
 import { playScoreSound, playUiSound } from '@/services/sounds';
 
 type ScreenState = 'list' | 'quiz' | 'll-result' | 'calculator' | 'lq-questions' | 'calc-result';
@@ -124,7 +123,6 @@ export default function TestsScreen() {
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { incrementTests, profile, saveCreation } = useApp();
-  const recordPromoCompletion = usePromoStore((s) => s.recordCompletion);
   const toast = useToast();
   const account = useAuthStore((s) => s.account);
   const partnerLink = usePartnerStore((s) => s.link);
@@ -251,14 +249,13 @@ export default function TestsScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       playScoreSound(resultScore);
       setScreenState('calc-result');
-      void showInterstitialAd(`test_completed_${calculatorType}`);
-      void recordPromoCompletion(`test_completed_${calculatorType}`);
+      showCompletionPlacement(`test_completed_${calculatorType}`);
     } catch {
       toast.error('Could not connect. Check your connection and try again.');
     } finally {
       setCalcLoading(false);
     }
-  }, [activeCalcTest, calcInput1, calcInput2, calcInput3, calcInput4, soulmateInterests, toast, recordPromoCompletion]);
+  }, [activeCalcTest, calcInput1, calcInput2, calcInput3, calcInput4, soulmateInterests, toast]);
 
   const handleAnswer = useCallback((answerId: string) => {
     void Haptics.selectionAsync();
@@ -269,7 +266,7 @@ export default function TestsScreen() {
   const handleNext = useCallback(() => {
     if (!selectedAnswer) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void playUiSound('next');
+    void playUiSound(currentQuestion < LOVE_LANGUAGE_QUESTIONS.length - 1 ? 'next' : 'submit');
     const question = LOVE_LANGUAGE_QUESTIONS[currentQuestion];
     const answer = question.answers.find(a => a.id === selectedAnswer);
     if (!answer) return;
@@ -292,9 +289,8 @@ export default function TestsScreen() {
       setScreenState('ll-result');
       incrementTests();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      void playUiSound('highScore');
-      void showInterstitialAd('test_completed_love_language');
-      void recordPromoCompletion('test_completed_love_language');
+      setTimeout(() => { void playUiSound('quizDone'); }, 350);
+      showCompletionPlacement('test_completed_love_language');
       resultBounceAnim.setValue(0);
       resultOpacityAnim.setValue(0);
       Animated.parallel([
@@ -302,7 +298,7 @@ export default function TestsScreen() {
         Animated.timing(resultOpacityAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
       ]).start();
     }
-  }, [currentQuestion, selectedAnswer, answers, incrementTests, recordPromoCompletion, resultBounceAnim, resultOpacityAnim]);
+  }, [currentQuestion, selectedAnswer, answers, incrementTests, resultBounceAnim, resultOpacityAnim]);
 
   const handleBack = useCallback(() => {
     setScreenState('list');
@@ -415,6 +411,7 @@ export default function TestsScreen() {
     if (lqCurrentQ < lqQuestions.length - 1) {
       setLqCurrentQ(lqCurrentQ + 1);
     } else {
+      setTimeout(() => { void playUiSound('submit'); }, 180);
       const total = newAnswers.reduce((s, c) => s + c, 0);
       const finalScore = Math.round((total / (lqQuestions.length * 5)) * 100);
       setCalcLoading(true);
@@ -431,11 +428,10 @@ export default function TestsScreen() {
       } finally {
         setCalcLoading(false);
         setScreenState('calc-result');
-        void showInterstitialAd('test_completed_love_quiz');
-        void recordPromoCompletion('test_completed_love_quiz');
+        showCompletionPlacement('test_completed_love_quiz');
       }
     }
-  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests, recordPromoCompletion]);
+  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests]);
 
   // ── Quiz screen ──────────────────────────────────────────────────────────────
   if (screenState === 'quiz') {

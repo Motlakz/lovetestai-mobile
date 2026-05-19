@@ -29,6 +29,7 @@ import GoldDivider from '@/components/ui/GoldDivider';
 import SectionTitle from '@/components/ui/SectionTitle';
 import HeartParticles from '@/components/ui/HeartParticles';
 import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
+import InAppPromoAdSlot from '@/components/promos/InAppPromoAdSlot';
 import { useApp } from '@/context/AppContext';
 import { DAILY_PROMPTS, PROMPT_CATEGORIES } from '@/mocks/tests';
 import { useToast } from '@/components/ui/Toast';
@@ -512,7 +513,7 @@ export default function DailyScreen() {
         )}
       </GlassCard>
 
-      <AdMobNativeAd placement="daily_before_reflections" />
+      <InAppPromoAdSlot placement="daily_below_todays_prompt" />
 
       {journalEntries.length > 0 && (
         <>
@@ -564,6 +565,7 @@ export default function DailyScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+      <InAppPromoAdSlot placement="daily_browse_below_category_pills" />
       <View style={styles.browseList}>
         {filteredBrowsePrompts.length === 0 ? (
           <View style={styles.emptyState}>
@@ -636,6 +638,8 @@ export default function DailyScreen() {
           />
         </View>
       </GlassCard>
+
+      <InAppPromoAdSlot placement="daily_partner_below_partner_prompt" />
 
       <SectionTitle title="Browse for Two" style={styles.sectionTitle} />
       <View style={styles.browseList}>

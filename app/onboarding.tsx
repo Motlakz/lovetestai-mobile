@@ -160,6 +160,8 @@ export default function OnboardingScreen() {
     try {
       await saveNotifPrefs({
         enabled: true,
+        pushEnabled: true,
+        inAppEnabled: true,
         soundEnabled: true,
         hour: notifHour,
         minute: notifMinute,
@@ -174,7 +176,7 @@ export default function OnboardingScreen() {
 
   const handleSkipNotifications = useCallback(async () => {
     try {
-      await saveNotifPrefs({ ...DEFAULT_NOTIF_PREFS, enabled: false });
+      await saveNotifPrefs({ ...DEFAULT_NOTIF_PREFS, enabled: false, pushEnabled: false, inAppEnabled: false });
     } catch (e) {
       console.log('Save notif prefs failed:', e);
     }

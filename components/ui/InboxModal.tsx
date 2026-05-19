@@ -99,7 +99,7 @@ export default function InboxModal({ visible, onClose }: Props) {
           {items.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="notifications-off-outline" size={36} color={colors.text_muted} />
-              <Text style={[styles.emptyText, { color: colors.text_muted }]}>You're all caught up.</Text>
+              <Text style={[styles.emptyText, { color: colors.text_muted }]}>You&apos;re all caught up.</Text>
             </View>
           ) : (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>

@@ -11,6 +11,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import GradientButton from '@/components/ui/GradientButton';
 import GhostButton from '@/components/ui/GhostButton';
 import AdMobNativeAd from '@/components/ads/AdMobNativeAd';
+import InAppPromoAdSlot from '@/components/promos/InAppPromoAdSlot';
 import { useTheme } from '@/context/ThemeContext';
 import { fontSizes, radius, spacing } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
@@ -427,7 +428,7 @@ export default function PartnerLiteScreen() {
           </GlassCard>
         )}
 
-        {account && !isPaired && <AdMobNativeAd placement="partner_after_pair_create_card" />}
+        {account && !isPaired && <InAppPromoAdSlot placement="partner_after_pair_create_card" />}
 
         {account && isPaired && link && (
           <>

@@ -1,12 +1,24 @@
 import { Platform } from 'react-native';
 
-export type UiSound = 'next' | 'submit' | 'highScore' | 'mediumScore' | 'optionSelect' | 'messagePing';
+export type UiSound =
+  | 'next'
+  | 'submit'
+  | 'complete'
+  | 'quizDone'
+  | 'highScore'
+  | 'mediumScore'
+  | 'lowScore'
+  | 'optionSelect'
+  | 'messagePing';
 
 const SOUND_SOURCES: Record<UiSound, number> = {
   next: require('@/assets/sounds/public_sounds_button_next.mp3'),
   submit: require('@/assets/sounds/public_sounds_button_submit.mp3'),
+  complete: require('@/assets/sounds/complete.mp3'),
+  quizDone: require('@/assets/sounds/quiz_done.mp3'),
   highScore: require('@/assets/sounds/public_sounds_high_score.mp3'),
   mediumScore: require('@/assets/sounds/public_sounds_medium_score.mp3'),
+  lowScore: require('@/assets/sounds/public_sounds_medium_score.mp3'),
   messagePing: require('@/assets/sounds/message_ping.mp3'),
   optionSelect: require('@/assets/sounds/public_sounds_option_select.mp3'),
 };
@@ -52,10 +64,22 @@ export async function playUiSound(sound: UiSound): Promise<void> {
   }
 }
 
-export function playScoreSound(score?: number | null): void {
-  if (typeof score === 'number' && score >= 80) {
-    void playUiSound('highScore');
+export function playScoreSound(score?: number | null, delayMs = 300): void {
+  const play = (sound: UiSound) => {
+    if (delayMs > 0) {
+      setTimeout(() => { void playUiSound(sound); }, delayMs);
+    } else {
+      void playUiSound(sound);
+    }
+  };
+
+  if (typeof score !== 'number') {
+    play('mediumScore');
+  } else if (score > 70) {
+    play('highScore');
+  } else if (score >= 40) {
+    play('mediumScore');
   } else {
-    void playUiSound('mediumScore');
+    play('lowScore');
   }
 }

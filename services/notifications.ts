@@ -1,9 +1,12 @@
 import { loadNotifPrefs, persistNotifPrefs, getDailyPromptLock, setDailyPromptLock } from '@/services/db';
+import { syncPushReminderSchedule } from '@/services/pushNotifications';
 
 export type NotifFrequency = 'daily' | '3x_week' | 'weekly' | 'monthly';
 
 export interface NotifPrefs {
   enabled: boolean;
+  pushEnabled: boolean;
+  inAppEnabled: boolean;
   soundEnabled: boolean;
   hour: number;
   minute: number;
@@ -12,6 +15,8 @@ export interface NotifPrefs {
 
 export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   enabled: true,
+  pushEnabled: true,
+  inAppEnabled: true,
   soundEnabled: true,
   hour: 9,
   minute: 0,
@@ -102,11 +107,24 @@ function isFrequencyDay(frequency: NotifFrequency, date: Date): boolean {
 
 export async function loadPrefs(): Promise<NotifPrefs> {
   const stored = await loadNotifPrefs();
-  return stored ? { ...DEFAULT_NOTIF_PREFS, ...stored } : DEFAULT_NOTIF_PREFS;
+  if (!stored) return DEFAULT_NOTIF_PREFS;
+  const enabled = stored.enabled ?? DEFAULT_NOTIF_PREFS.enabled;
+  return {
+    ...DEFAULT_NOTIF_PREFS,
+    ...stored,
+    enabled,
+    pushEnabled: stored.pushEnabled ?? enabled,
+    inAppEnabled: stored.inAppEnabled ?? enabled,
+  };
 }
 
 export async function savePrefs(prefs: NotifPrefs): Promise<void> {
-  await persistNotifPrefs(prefs);
+  const next = {
+    ...prefs,
+    enabled: prefs.pushEnabled || prefs.inAppEnabled,
+  };
+  await persistNotifPrefs(next);
+  await syncPushReminderSchedule(next);
 }
 
 /**
@@ -116,7 +134,7 @@ export async function savePrefs(prefs: NotifPrefs): Promise<void> {
  */
 export async function claimDailyPromptSlot(): Promise<boolean> {
   const prefs = await loadPrefs();
-  if (!prefs.enabled) return false;
+  if (!prefs.enabled || !prefs.inAppEnabled) return false;
 
   const now = new Date();
   if (!isFrequencyDay(prefs.frequency, now)) return false;

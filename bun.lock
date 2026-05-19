@@ -40,7 +40,7 @@
         "expo-web-browser": "~15.0.10",
         "firebase": "^12.13.0",
         "lucide-react-native": "^0.475.0",
-        "notify-kit": "^1.0.6",
+        "react-native-notify-kit": "^9.3.0",
         "react": "19.1.0",
         "react-dom": "19.1.0",
         "react-native": "0.81.5",
@@ -1528,7 +1528,7 @@
 
     "normalize-url": ["normalize-url@6.1.0", "", {}, "sha512-DlL+XwOy3NxAQ8xuC0okPgK46iuVNAK01YN7RueYBqqFeGsBjV9XmCAzAdgt+667bCl5kPh9EqKKDwnaPG1I7A=="],
 
-    "notify-kit": ["notify-kit@1.0.6", "", { "dependencies": { "@fortawesome/fontawesome-free": "^6.6.0", "react-icons": "^5.2.1", "user": "^0.0.0" } }, "sha512-IUdLDoxsmFBxH47NR6+gaWzQuo9SspAu4w36kFII8oVphGwKg2ucTQMGOcV0+raoprZPxubfUYJbpD+sn7Mibw=="],
+    "react-native-notify-kit": ["react-native-notify-kit@9.7.0", "", { "peerDependencies": { "react-native": ">=0.73.0" } }, "sha512-r7EVBTI0IB22ey7WPqWwGdASAybzD47QBVCPIwT327UNh/0yMVvGgW12b8IxWFv1Z2zMXI4aprXoo+gey8XsxA=="],
 
     "npm-package-arg": ["npm-package-arg@11.0.3", "", { "dependencies": { "hosted-git-info": "^7.0.0", "proc-log": "^4.0.0", "semver": "^7.3.5", "validate-npm-package-name": "^5.0.0" } }, "sha512-sHGJy8sOC1YraBywpzQlIKBE4pBbGbiF95U6Auspzyem956E0+FtDtsx1ZxlOJkQCZ1AFXAY/yuvtFYrOxF+Bw=="],
 

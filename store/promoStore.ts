@@ -67,7 +67,7 @@ export const APP_PROMOS: AppPromo[] = [
     cta: 'Open BellyClock',
     iconName: 'timer-outline',
     accent: '#f97316',
-    deepLink: process.env.EXPO_PUBLIC_BELLYCLOCK_DEEP_LINK || 'bellyclock://',
+    deepLink: process.env.EXPO_PUBLIC_BELLYCLOCK_DEEP_LINK || 'https://bellyclock.com',
     storeUrl: process.env.EXPO_PUBLIC_BELLYCLOCK_STORE_URL || 'https://play.google.com/store/apps/details?id=com.bellyclock',
   },
   {
@@ -80,7 +80,7 @@ export const APP_PROMOS: AppPromo[] = [
     cta: 'Open Heartloop',
     iconName: 'heart-outline',
     accent: '#fb7185',
-    deepLink: process.env.EXPO_PUBLIC_HEARTLOOP_DEEP_LINK || 'heartloop://',
+    deepLink: process.env.EXPO_PUBLIC_HEARTLOOP_DEEP_LINK || 'https://heartloopai.com',
     storeUrl: process.env.EXPO_PUBLIC_HEARTLOOP_STORE_URL || 'https://play.google.com/store/apps/details?id=com.heartloop',
   },
 ];

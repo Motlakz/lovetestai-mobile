@@ -70,8 +70,7 @@ import {
   trackShare,
   trackScreen,
 } from '@/services/analytics';
-import { showInterstitialAd } from '@/services/adMob';
-import { usePromoStore } from '@/store/promoStore';
+import { showCompletionPlacement } from '@/services/completionPlacement';
 import { playUiSound } from '@/services/sounds';
 
 const TOOL_META: Record<string, { title: string; icon: string; subtitle: string; cta: string }> = {
@@ -216,7 +215,6 @@ export default function CreateModeScreen() {
   const { colors, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const { saveCreation, profile } = useApp();
-  const recordPromoCompletion = usePromoStore((s) => s.recordCompletion);
   const toast = useToast();
   const { alert } = useAppAlert();
   const recordFeedbackUse = useFeedbackStore((state) => state.recordUse);
@@ -293,9 +291,8 @@ export default function CreateModeScreen() {
       });
       Animated.spring(resultAnim, { toValue: 1, useNativeDriver: true, damping: 15 }).start();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      void playUiSound('highScore');
-      void showInterstitialAd(`generator_completed_${selectedTool}`);
-      void recordPromoCompletion(`generator_completed_${selectedTool}`);
+      setTimeout(() => { void playUiSound('complete'); }, 350);
+      showCompletionPlacement(`generator_completed_${selectedTool}`);
       setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 300);
     } catch (error) {
       console.log('Generation error:', error);
@@ -304,7 +301,7 @@ export default function CreateModeScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast, recordFeedbackUse, recordPromoCompletion, meta.title]);
+  }, [selectedTool, fromName, toName, tone, length, detail, occasion, poemStyle, memory, message, word, resultAnim, toast, recordFeedbackUse, meta.title]);
 
   const handleCopy = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -300,6 +300,8 @@ export async function persistPartnerLink(link: PartnerLink | null): Promise<void
 
 export interface PersistedNotifPrefs {
   enabled: boolean;
+  pushEnabled?: boolean;
+  inAppEnabled?: boolean;
   soundEnabled?: boolean;
   hour: number;
   minute: number;
