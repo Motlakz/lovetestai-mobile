@@ -1,7 +1,16 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getDatabase, type Database } from 'firebase/database';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  initializeAuth,
+  type Auth,
+  type Persistence,
+} from 'firebase/auth';
+import * as FirebaseAuth from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -33,6 +42,12 @@ const isConfigured = () => !!(
   !isPlaceholderLike(firebaseConfig.authDomain)
 );
 
+const getReactNativePersistence = (
+  FirebaseAuth as typeof FirebaseAuth & {
+    getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
+  }
+).getReactNativePersistence;
+
 export const isFirebaseAvailable = isConfigured();
 
 export const app: FirebaseApp | null = isFirebaseAvailable
@@ -47,9 +62,17 @@ let database: Database | null = null;
 
 if (app) {
   try {
-    auth = getAuth(app);
+    auth = Platform.OS === 'web' || !getReactNativePersistence
+      ? getAuth(app)
+      : initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
   } catch (error) {
-    console.warn('Firebase Auth initialization failed:', error);
+    try {
+      auth = getAuth(app);
+    } catch {
+      console.warn('Firebase Auth initialization failed:', error);
+    }
   }
 
   try {

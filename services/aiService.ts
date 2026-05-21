@@ -297,7 +297,7 @@ export async function analyzeLoveCompatibility(
 ): Promise<{ result: string; adjustedScore: number }> {
   try {
     const data = await postJson<{ result: string; adjustedScore?: number }>('/api/analyze-compatibility', {
-      person1, person2, loveLanguage1, loveLanguage2, score, recaptchaToken,
+      person1, person2, loveLanguage1, loveLanguage2, score, recaptchaToken: recaptchaToken || 'mobile',
     });
     trackGeneratorCompleted('love-quiz', 'platform');
     return { result: data.result, adjustedScore: data.adjustedScore ?? score };
@@ -320,7 +320,7 @@ export async function calculateLoveScore(
   recaptchaToken?: string
 ): Promise<{ score: number; insight: string; message: string }> {
   try {
-    const result = await postJson<{ score: number; insight: string; message: string }>('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
+    const result = await postJson<{ score: number; insight: string; message: string }>('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken: recaptchaToken || 'mobile' });
     trackGeneratorCompleted('love-score', 'platform');
     return result;
   } catch (error) {
@@ -340,7 +340,7 @@ export async function calculateZodiacCompatibility(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    const result = await postJson<{ score: number; analysis: string }>('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken: recaptchaToken || 'mobile' });
     trackGeneratorCompleted('zodiac', 'platform');
     return result;
   } catch (error) {
@@ -360,7 +360,7 @@ export async function calculateBirthdateCompatibility(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    const result = await postJson<{ score: number; analysis: string }>('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/birthdate-compatibility', { date1, date2, recaptchaToken: recaptchaToken || 'mobile' });
     trackGeneratorCompleted('birthdate', 'platform');
     return result;
   } catch (error) {
@@ -382,7 +382,7 @@ export async function calculateNumerology(
   recaptchaToken?: string
 ): Promise<{ score: number; analysis: string }> {
   try {
-    const result = await postJson<{ score: number; analysis: string }>('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
+    const result = await postJson<{ score: number; analysis: string }>('/api/numerology', { name1, name2, date1, date2, recaptchaToken: recaptchaToken || 'mobile' });
     trackGeneratorCompleted('numerology', 'platform');
     return result;
   } catch (error) {
@@ -405,7 +405,7 @@ export async function findSoulmate(data: {
   recaptchaToken?: string;
 }): Promise<{ analysis: string; traits: string[] }> {
   try {
-    const result = await postJson<{ analysis: string; traits: string[] }>('/api/soulmate-finder', data);
+    const result = await postJson<{ analysis: string; traits: string[] }>('/api/soulmate-finder', { ...data, recaptchaToken: data.recaptchaToken || 'mobile' });
     trackGeneratorCompleted('soulmate', 'platform');
     return result;
   } catch (error) {
@@ -434,7 +434,7 @@ export async function generatePoem(
     theme,
     poemLength,
     rhyming,
-    recaptchaToken,
+    recaptchaToken: recaptchaToken || 'mobile',
   });
   trackGeneratorCompleted('love-poem', 'platform');
   return data.poem;

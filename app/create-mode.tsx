@@ -126,6 +126,37 @@ const GLYPH_ICONS: Record<string, LucideIcon> = {
   water: Waves,
 };
 
+function getToolCardTheme(tool: string, isDark: boolean) {
+  const themes: Record<string, { accent: string; border: string; fill: string; gloss: readonly [string, string] }> = {
+    'love-letter': {
+      accent: isDark ? '#FDA4AF' : '#BE123C',
+      border: isDark ? 'rgba(253,164,175,0.34)' : 'rgba(190,18,60,0.18)',
+      fill: isDark ? 'rgba(30,13,20,0.90)' : 'rgba(255,248,249,0.95)',
+      gloss: isDark ? ['rgba(253,164,175,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(255,228,230,0.28)'],
+    },
+    'love-poem': {
+      accent: isDark ? '#F9A8D4' : '#BE185D',
+      border: isDark ? 'rgba(249,168,212,0.34)' : 'rgba(190,24,93,0.18)',
+      fill: isDark ? 'rgba(31,10,27,0.90)' : 'rgba(253,246,251,0.95)',
+      gloss: isDark ? ['rgba(249,168,212,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(252,231,243,0.32)'],
+    },
+    'love-note': {
+      accent: isDark ? '#A5B4FC' : '#4338CA',
+      border: isDark ? 'rgba(165,180,252,0.34)' : 'rgba(67,56,202,0.18)',
+      fill: isDark ? 'rgba(12,17,37,0.91)' : 'rgba(247,248,255,0.95)',
+      gloss: isDark ? ['rgba(165,180,252,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(224,231,255,0.34)'],
+    },
+    'love-quote': {
+      accent: isDark ? '#C4B5FD' : '#6D28D9',
+      border: isDark ? 'rgba(196,181,253,0.34)' : 'rgba(109,40,217,0.18)',
+      fill: isDark ? 'rgba(20,12,34,0.91)' : 'rgba(250,247,255,0.95)',
+      gloss: isDark ? ['rgba(196,181,253,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(237,233,254,0.34)'],
+    },
+  };
+
+  return themes[tool] ?? themes['love-letter'];
+}
+
 function formatChoiceLabel(value: string): string {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -135,7 +166,7 @@ const OCCASION_OPTIONS = OCCASIONS.map((value) => ({ value, label: formatChoiceL
 const LENGTH_OPTIONS = LENGTHS.map((value) => ({ value, label: value }));
 const POEM_STYLE_OPTIONS = POEM_STYLES.map((value) => ({ value, label: value }));
 
-function createStyles(c: ThemeColors, _s: ThemeShadows) {
+function createStyles(c: ThemeColors, _s: ThemeShadows, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1 },
     container: { flex: 1 },
@@ -145,7 +176,20 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     topBarTitle: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '700' as const },
     topBarSub: { fontSize: fontSizes.xs, color: c.text_muted },
     scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing['3xl'] },
-    formPanel: { padding: spacing.xl, marginBottom: spacing.lg },
+    formPanel: { padding: spacing.xl, marginBottom: spacing.lg, overflow: 'hidden' as const, position: 'relative' as const, borderWidth: 1 },
+    formGloss: { position: 'absolute' as const, top: 0, left: 0, right: 0, height: 96, opacity: isDark ? 0.8 : 1 },
+    formBgBlob: {
+      position: 'absolute' as const,
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    formBgBlobTopLeft: { top: -42, left: -42 },
+    formBgBlobBottomRight: { right: -34, bottom: -34 },
+    formBgIcon: { opacity: isDark ? 0.22 : 0.16 },
+    formPanelContent: { position: 'relative' as const, zIndex: 1 },
     generateBtn: { marginBottom: spacing.sm },
     disclaimer: { color: c.text_muted, fontSize: fontSizes.xs, textAlign: 'center' as const, marginBottom: spacing.xl },
     resultContainer: { marginTop: spacing.md },
@@ -212,8 +256,8 @@ export default function CreateModeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { tool, content: preloadContent, toName: preloadToName, autoExport } = useLocalSearchParams<{ tool: string; content?: string; toName?: string; autoExport?: string }>();
-  const { colors, shadows } = useTheme();
-  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+  const { colors, shadows, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, shadows, isDark), [colors, shadows, isDark]);
   const { saveCreation, profile } = useApp();
   const toast = useToast();
   const { alert } = useAppAlert();
@@ -247,6 +291,7 @@ export default function CreateModeScreen() {
   const exportShotRef = useRef<ViewShot | null>(null);
   const fullExportShotRef = useRef<ViewShot | null>(null);
   const selectedTool = tool || 'love-letter';
+  const toolCardTheme = useMemo(() => getToolCardTheme(selectedTool, isDark), [selectedTool, isDark]);
   const availableTemplates = useMemo(() => getTemplatesForTool(selectedTool), [selectedTool]);
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) ?? defaultTemplate;
 
@@ -541,16 +586,25 @@ export default function CreateModeScreen() {
             <Ionicons name={meta.icon as any} size={24} color={colors.accent_violet} />
           </View>
           <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <GlassCard style={styles.formPanel}>
-              <>
-                <InputField label="For" value={toName} onChangeText={setToName} placeholder="Their first name" />
-                <InputField label="From" value={fromName} onChangeText={setFromName} placeholder="Your name" />
-              </>
-              <SelectField label="Vibe" value={tone} onChange={setTone} options={VIBE_OPTIONS} placeholder="Choose a vibe" />
-              {(selectedTool === 'love-letter' || selectedTool === 'love-poem') && (
-                <SelectField label="Length" value={length} onChange={setLength} options={LENGTH_OPTIONS} placeholder="Choose a length" />
-              )}
-              {renderToolFields()}
+            <GlassCard style={[styles.formPanel, { backgroundColor: toolCardTheme.fill, borderColor: toolCardTheme.border }]}>
+              <LinearGradient colors={toolCardTheme.gloss as any} style={styles.formGloss} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
+              <View style={[styles.formBgBlob, styles.formBgBlobTopLeft, { backgroundColor: `${toolCardTheme.accent}10` }]}>
+                <Ionicons name={meta.icon as any} size={58} color={toolCardTheme.accent} style={styles.formBgIcon} />
+              </View>
+              <View style={[styles.formBgBlob, styles.formBgBlobBottomRight, { backgroundColor: `${toolCardTheme.accent}14` }]}>
+                <Ionicons name={meta.icon as any} size={66} color={toolCardTheme.accent} style={styles.formBgIcon} />
+              </View>
+              <View style={styles.formPanelContent}>
+                <>
+                  <InputField label="For" value={toName} onChangeText={setToName} placeholder="Their first name" />
+                  <InputField label="From" value={fromName} onChangeText={setFromName} placeholder="Your name" />
+                </>
+                <SelectField label="Vibe" value={tone} onChange={setTone} options={VIBE_OPTIONS} placeholder="Choose a vibe" />
+                {(selectedTool === 'love-letter' || selectedTool === 'love-poem') && (
+                  <SelectField label="Length" value={length} onChange={setLength} options={LENGTH_OPTIONS} placeholder="Choose a length" />
+                )}
+                {renderToolFields()}
+              </View>
             </GlassCard>
             <GradientButton label={meta.cta} onPress={handleGenerate} disabled={isLoading} style={styles.generateBtn} />
             {isLoading && <LoadingPulse />}

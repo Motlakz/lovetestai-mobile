@@ -34,12 +34,50 @@ interface FeatureCard {
   icon: string;
   label: string;
   description: string;
-  gradient: [string, string];
   route?: string;
   badge?: string;
 }
 
-function createStyles(c: ThemeColors, _s: ThemeShadows) {
+function getFeatureTheme(id: string, isDark: boolean) {
+  const themes: Record<string, { accent: string; border: readonly [string, string, string]; fill: string; iconFill: string; iconBorder: string; gloss: readonly [string, string] }> = {
+    'love-letter': {
+      accent: isDark ? '#FDA4AF' : '#BE123C',
+      border: isDark ? ['rgba(251,113,133,0.64)', 'rgba(255,228,230,0.18)', 'rgba(255,255,255,0.10)'] : ['rgba(244,63,94,0.30)', 'rgba(255,205,213,0.34)', 'rgba(255,255,255,0.92)'],
+      fill: isDark ? 'rgba(30,13,20,0.90)' : 'rgba(255,248,249,0.95)',
+      iconFill: isDark ? 'rgba(251,113,133,0.14)' : 'rgba(190,18,60,0.075)',
+      iconBorder: isDark ? 'rgba(253,164,175,0.34)' : 'rgba(190,18,60,0.18)',
+      gloss: isDark ? ['rgba(253,164,175,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(255,228,230,0.28)'],
+    },
+    'love-poem': {
+      accent: isDark ? '#F9A8D4' : '#BE185D',
+      border: isDark ? ['rgba(244,114,182,0.66)', 'rgba(236,72,153,0.30)', 'rgba(255,255,255,0.10)'] : ['rgba(219,39,119,0.30)', 'rgba(252,231,243,0.48)', 'rgba(255,255,255,0.92)'],
+      fill: isDark ? 'rgba(31,10,27,0.90)' : 'rgba(253,246,251,0.95)',
+      iconFill: isDark ? 'rgba(244,114,182,0.14)' : 'rgba(190,24,93,0.075)',
+      iconBorder: isDark ? 'rgba(249,168,212,0.34)' : 'rgba(190,24,93,0.18)',
+      gloss: isDark ? ['rgba(249,168,212,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(252,231,243,0.32)'],
+    },
+    'love-note': {
+      accent: isDark ? '#A5B4FC' : '#4338CA',
+      border: isDark ? ['rgba(99,102,241,0.64)', 'rgba(129,140,248,0.28)', 'rgba(255,255,255,0.10)'] : ['rgba(67,56,202,0.30)', 'rgba(224,231,255,0.52)', 'rgba(255,255,255,0.92)'],
+      fill: isDark ? 'rgba(12,17,37,0.91)' : 'rgba(247,248,255,0.95)',
+      iconFill: isDark ? 'rgba(99,102,241,0.14)' : 'rgba(67,56,202,0.075)',
+      iconBorder: isDark ? 'rgba(165,180,252,0.34)' : 'rgba(67,56,202,0.18)',
+      gloss: isDark ? ['rgba(165,180,252,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(224,231,255,0.34)'],
+    },
+    'love-quote': {
+      accent: isDark ? '#C4B5FD' : '#6D28D9',
+      border: isDark ? ['rgba(124,58,237,0.62)', 'rgba(196,181,253,0.26)', 'rgba(255,255,255,0.10)'] : ['rgba(109,40,217,0.30)', 'rgba(237,233,254,0.52)', 'rgba(255,255,255,0.92)'],
+      fill: isDark ? 'rgba(20,12,34,0.91)' : 'rgba(250,247,255,0.95)',
+      iconFill: isDark ? 'rgba(124,58,237,0.14)' : 'rgba(109,40,217,0.075)',
+      iconBorder: isDark ? 'rgba(196,181,253,0.34)' : 'rgba(109,40,217,0.18)',
+      gloss: isDark ? ['rgba(196,181,253,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(237,233,254,0.34)'],
+    },
+  };
+
+  return themes[id] ?? themes['love-letter'];
+}
+
+function createStyles(c: ThemeColors, _s: ThemeShadows, isDark: boolean) {
   return StyleSheet.create({
     container: { flex: 1 },
     scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
@@ -51,13 +89,37 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
     greetingSection: { paddingTop: spacing.md, paddingBottom: spacing.lg },
     greetingSub: { fontSize: fontSizes.sm, color: c.text_secondary },
     cardGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.md, marginBottom: spacing.xl },
-    featureCard: { width: CARD_WIDTH, overflow: 'hidden' as const, position: 'relative' as const },
-    featureCardInner: { padding: spacing.lg, gap: spacing.sm, minHeight: 150 },
-    featureIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center' as const, justifyContent: 'center' as const },
+    featureCardFrame: {
+      width: CARD_WIDTH,
+      borderRadius: radius.xl + 2,
+      shadowColor: isDark ? '#D946EF' : '#8E24AA',
+      shadowOpacity: isDark ? 0.24 : 0.12,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 8,
+    },
+    featureCardBorder: { borderRadius: radius.xl + 2, padding: 1.2 },
+    featureCard: { width: '100%' as const, minHeight: 158, overflow: 'hidden' as const, position: 'relative' as const, borderWidth: 1 },
+    featureGloss: { position: 'absolute' as const, top: 0, left: 0, right: 0, height: 72, opacity: isDark ? 0.8 : 1 },
+    featureBgBlob: {
+      position: 'absolute' as const,
+      right: -30,
+      bottom: -30,
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      opacity: isDark ? 0.95 : 0.9,
+    },
+    featureBgIcon: { opacity: isDark ? 0.22 : 0.16 },
+    featureCardInner: { padding: spacing.lg, gap: spacing.sm, minHeight: 158, position: 'relative' as const, zIndex: 1 },
+    featureIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1 },
     featureLabel: { fontSize: fontSizes.md, color: c.text_primary, fontWeight: '600' as const },
     featureDesc: { fontSize: fontSizes.xs, color: c.text_secondary, lineHeight: 16 },
     featureBadge: { position: 'absolute' as const, top: spacing.sm, right: spacing.sm },
-    featureArrow: { position: 'absolute' as const, bottom: spacing.md, right: spacing.md },
+    featureArrow: { position: 'absolute' as const, top: spacing.md, right: spacing.md, zIndex: 2 },
+    featureArrowBubble: { width: 28, height: 28, borderRadius: 14, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1 },
     quickActionsRow: { flexDirection: 'row' as const, gap: spacing.sm, marginBottom: spacing.xl },
     quickAction: { flex: 1, padding: spacing.md, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm },
     quickActionLabel: { fontSize: fontSizes.sm, color: c.text_secondary, fontWeight: '500' as const },
@@ -71,19 +133,19 @@ function createStyles(c: ThemeColors, _s: ThemeShadows) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   const router = useRouter();
-  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+  const styles = useMemo(() => createStyles(colors, shadows, isDark), [colors, shadows, isDark]);
   const { profile } = useApp();
   const [inboxOpen, setInboxOpen] = useState(false);
   const unread = useInboxStore(s => unreadCount(s.items));
 
   const FEATURES: FeatureCard[] = useMemo(() => [
-    { id: 'love-letter', icon: 'mail-outline', label: 'Love Letter', description: 'Write a heartfelt, personal letter', gradient: [colors.grad_rose_start, colors.grad_rose_end], route: '/create-mode?tool=love-letter' },
-    { id: 'love-poem', icon: 'book-outline', label: 'Love Poem', description: 'Craft a romantic poem', gradient: [colors.grad_violet_start, colors.grad_violet_end], route: '/create-mode?tool=love-poem' },
-    { id: 'love-note', icon: 'chatbox-outline', label: 'Love Note', description: 'A quick, genuine note', gradient: [colors.accent_rose, colors.grad_violet_end], route: '/create-mode?tool=love-note' },
-    { id: 'love-quote', icon: 'text-outline', label: 'Love Quote', description: 'Generate a shareable quote', gradient: [colors.grad_gold_start, colors.grad_gold_end], route: '/create-mode?tool=love-quote' },
-  ], [colors]);
+    { id: 'love-letter', icon: 'mail-outline', label: 'Love Letter', description: 'Write a heartfelt, personal letter', route: '/create-mode?tool=love-letter' },
+    { id: 'love-poem', icon: 'book-outline', label: 'Love Poem', description: 'Craft a romantic poem', route: '/create-mode?tool=love-poem' },
+    { id: 'love-note', icon: 'chatbox-outline', label: 'Love Note', description: 'A quick, genuine note', route: '/create-mode?tool=love-note' },
+    { id: 'love-quote', icon: 'text-outline', label: 'Love Quote', description: 'Generate a shareable quote', route: '/create-mode?tool=love-quote' },
+  ], []);
 
   useEffect(() => {
     trackScreen('home', { generator_count: FEATURES.length });
@@ -142,30 +204,41 @@ export default function HomeScreen() {
 
           <SectionTitle title="Create Something Beautiful" />
           <View style={styles.cardGrid}>
-            {FEATURES.map((feature, index) => (
-              <Animated.View key={feature.id} style={{ transform: [{ scale: scaleAnims[index] }] }}>
-                <TouchableOpacity
-                  onPress={() => handleFeaturePress(feature)}
-                  onPressIn={() => handlePressIn(index)}
-                  onPressOut={() => handlePressOut(index)}
-                  activeOpacity={1}
-                >
-                  <GlassCard style={styles.featureCard}>
-                    <View style={styles.featureCardInner}>
-                      {feature.badge && <GoldBadge label={feature.badge} style={styles.featureBadge} />}
-                      <LinearGradient colors={feature.gradient} style={styles.featureIconWrap} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                        <Ionicons name={feature.icon as any} size={22} color="#FFFFFF" />
-                      </LinearGradient>
-                      <Text style={styles.featureLabel}>{feature.label}</Text>
-                      <Text style={styles.featureDesc} numberOfLines={2}>{feature.description}</Text>
-                    </View>
-                    <View style={styles.featureArrow}>
-                      <Ionicons name="arrow-forward-circle-outline" size={20} color={colors.text_muted} />
-                    </View>
-                  </GlassCard>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+            {FEATURES.map((feature, index) => {
+              const theme = getFeatureTheme(feature.id, isDark);
+              return (
+                <Animated.View key={feature.id} style={[styles.featureCardFrame, { transform: [{ scale: scaleAnims[index] }] }]}>
+                  <TouchableOpacity
+                    onPress={() => handleFeaturePress(feature)}
+                    onPressIn={() => handlePressIn(index)}
+                    onPressOut={() => handlePressOut(index)}
+                    activeOpacity={1}
+                  >
+                    <LinearGradient colors={theme.border as any} style={styles.featureCardBorder} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                      <GlassCard style={[styles.featureCard, { backgroundColor: theme.fill, borderColor: theme.iconBorder }]}>
+                        <LinearGradient colors={theme.gloss as any} style={styles.featureGloss} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
+                        <View style={[styles.featureBgBlob, { backgroundColor: theme.iconFill }]}>
+                          <Ionicons name={feature.icon as any} size={58} color={theme.accent} style={styles.featureBgIcon} />
+                        </View>
+                        <View style={styles.featureCardInner}>
+                          {feature.badge && <GoldBadge label={feature.badge} style={styles.featureBadge} />}
+                          <View style={[styles.featureIconWrap, { backgroundColor: theme.iconFill, borderColor: theme.iconBorder }]}>
+                            <Ionicons name={feature.icon as any} size={22} color={theme.accent} />
+                          </View>
+                          <Text style={styles.featureLabel}>{feature.label}</Text>
+                          <Text style={styles.featureDesc} numberOfLines={2}>{feature.description}</Text>
+                        </View>
+                        <View style={styles.featureArrow}>
+                          <View style={[styles.featureArrowBubble, { backgroundColor: theme.iconFill, borderColor: theme.iconBorder }]}>
+                            <Ionicons name="arrow-forward" size={15} color={theme.accent} />
+                          </View>
+                        </View>
+                      </GlassCard>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
 
           <AdMobNativeAd placement="home_before_quick_actions" />

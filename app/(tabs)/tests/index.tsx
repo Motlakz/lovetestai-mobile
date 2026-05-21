@@ -58,6 +58,55 @@ function waitForMinimumDuration(startedAt: number): Promise<void> {
   return remaining > 0 ? new Promise(resolve => setTimeout(resolve, remaining)) : Promise.resolve();
 }
 
+function getTestFormTheme(type: string, isDark: boolean) {
+  const themes: Record<string, { accent: string; border: string; fill: string; gloss: readonly [string, string] }> = {
+    'love-language': {
+      accent: isDark ? '#FDA4AF' : '#BE123C',
+      border: isDark ? 'rgba(253,164,175,0.34)' : 'rgba(190,18,60,0.18)',
+      fill: isDark ? 'rgba(30,13,20,0.90)' : 'rgba(255,248,249,0.95)',
+      gloss: isDark ? ['rgba(253,164,175,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(255,228,230,0.28)'],
+    },
+    zodiac: {
+      accent: isDark ? '#C4B5FD' : '#6D28D9',
+      border: isDark ? 'rgba(196,181,253,0.34)' : 'rgba(109,40,217,0.18)',
+      fill: isDark ? 'rgba(19,12,34,0.91)' : 'rgba(250,247,255,0.95)',
+      gloss: isDark ? ['rgba(196,181,253,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(237,233,254,0.34)'],
+    },
+    birthdate: {
+      accent: isDark ? '#5EEAD4' : '#0F766E',
+      border: isDark ? 'rgba(94,234,212,0.32)' : 'rgba(15,118,110,0.18)',
+      fill: isDark ? 'rgba(8,28,29,0.90)' : 'rgba(240,253,250,0.95)',
+      gloss: isDark ? ['rgba(94,234,212,0.11)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(204,251,241,0.32)'],
+    },
+    'love-score': {
+      accent: isDark ? '#F9A8D4' : '#BE185D',
+      border: isDark ? 'rgba(249,168,212,0.34)' : 'rgba(190,24,93,0.18)',
+      fill: isDark ? 'rgba(31,10,27,0.90)' : 'rgba(253,246,251,0.95)',
+      gloss: isDark ? ['rgba(249,168,212,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(252,231,243,0.32)'],
+    },
+    numerology: {
+      accent: isDark ? '#FDE68A' : '#8A5A00',
+      border: isDark ? 'rgba(253,230,138,0.32)' : 'rgba(138,90,0,0.18)',
+      fill: isDark ? 'rgba(28,21,12,0.90)' : 'rgba(255,252,242,0.95)',
+      gloss: isDark ? ['rgba(253,230,138,0.11)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(254,243,199,0.34)'],
+    },
+    soulmate: {
+      accent: isDark ? '#FB7185' : '#BE123C',
+      border: isDark ? 'rgba(251,113,133,0.34)' : 'rgba(190,18,60,0.18)',
+      fill: isDark ? 'rgba(32,12,20,0.90)' : 'rgba(255,247,248,0.95)',
+      gloss: isDark ? ['rgba(251,113,133,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(255,228,230,0.30)'],
+    },
+    'love-quiz': {
+      accent: isDark ? '#A5B4FC' : '#4338CA',
+      border: isDark ? 'rgba(165,180,252,0.34)' : 'rgba(67,56,202,0.18)',
+      fill: isDark ? 'rgba(12,17,37,0.91)' : 'rgba(247,248,255,0.95)',
+      gloss: isDark ? ['rgba(165,180,252,0.12)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.86)', 'rgba(224,231,255,0.34)'],
+    },
+  };
+
+  return themes[type] ?? themes['love-language'];
+}
+
 function createStyles(c: ThemeColors, s: ThemeShadows, isDark: boolean) {
   const acrylicFill = isDark ? 'rgba(18, 10, 28, 0.88)' : 'rgba(255, 250, 253, 0.92)';
   const acrylicInset = isDark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.86)';
@@ -173,6 +222,20 @@ function createStyles(c: ThemeColors, s: ThemeShadows, isDark: boolean) {
     progressContainer: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
     quizContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
     questionText: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '600' as const, textAlign: 'center' as const, marginBottom: spacing['2xl'], lineHeight: 38 },
+    themedFormCard: { padding: spacing.xl, marginBottom: spacing.xl, overflow: 'hidden' as const, position: 'relative' as const, borderWidth: 1 },
+    themedFormGloss: { position: 'absolute' as const, top: 0, left: 0, right: 0, height: 96, opacity: isDark ? 0.8 : 1 },
+    themedFormBlob: {
+      position: 'absolute' as const,
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    themedFormBlobTopLeft: { top: -42, left: -42 },
+    themedFormBlobBottomRight: { right: -34, bottom: -34 },
+    themedFormBgIcon: { opacity: isDark ? 0.22 : 0.16 },
+    themedFormContent: { position: 'relative' as const, zIndex: 1 },
     answersContainer: { gap: spacing.md, marginBottom: spacing.xl },
     answerCard: { padding: spacing.lg, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },
     answerCardSelected: { ...s.rose_glow },
@@ -279,8 +342,8 @@ export default function TestsScreen() {
       toast.warning('Please select both birth dates.');
       return;
     }
-    if (calculatorType === 'love-score' && (!calcInput1 || !calcInput2 || !calcInput4)) {
-      toast.warning('Please enter both names and relationship status.');
+    if (calculatorType === 'love-score' && (!calcInput1 || !calcInput2 || !calcInput3 || !calcInput4)) {
+      toast.warning('Please enter both names, relationship status, and time together.');
       return;
     }
     if (calculatorType === 'love-quiz' && (!calcInput1 || !calcInput2 || !calcInput3 || !calcInput4)) {
@@ -343,8 +406,9 @@ export default function TestsScreen() {
       playScoreSound(resultScore);
       setScreenState('calc-result');
       showCompletionPlacement(`test_completed_${calculatorType}`);
-    } catch {
-      toast.error('Could not connect. Check your connection and try again.');
+    } catch (error) {
+      console.error('[CalcSubmit] Error:', error);
+      toast.error(`Could not connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setCalcLoading(false);
     }
@@ -534,6 +598,7 @@ export default function TestsScreen() {
   if (screenState === 'quiz') {
     const question = LOVE_LANGUAGE_QUESTIONS[currentQuestion];
     const progress = (currentQuestion + 1) / LOVE_LANGUAGE_QUESTIONS.length;
+    const formTheme = getTestFormTheme('love-language', isDark);
     return (
       <ScreenBackground>
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -545,23 +610,34 @@ export default function TestsScreen() {
           </View>
           <View style={styles.progressContainer}><ProgressBar progress={progress} /></View>
           <ScrollView contentContainerStyle={styles.quizContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.questionText}>{question.text}</Text>
-            <View style={styles.answersContainer}>
-              {question.answers.map((answer) => (
-                <TouchableOpacity key={answer.id} onPress={() => handleAnswer(answer.id)} activeOpacity={0.8}>
-                  <GlassCard style={[styles.answerCard, selectedAnswer === answer.id && styles.answerCardSelected]} gradient={selectedAnswer === answer.id}>
-                    <Text style={[styles.answerText, selectedAnswer === answer.id && styles.answerTextSelected]}>{answer.text}</Text>
-                    {selectedAnswer === answer.id && <Ionicons name="checkmark" size={20} color={colors.accent_rose} />}
-                  </GlassCard>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <GradientButton
-              label={currentQuestion < LOVE_LANGUAGE_QUESTIONS.length - 1 ? 'Next' : 'See Results'}
-              onPress={handleNext}
-              disabled={!selectedAnswer}
-              style={styles.nextBtn}
-            />
+            <GlassCard style={[styles.themedFormCard, { backgroundColor: formTheme.fill, borderColor: formTheme.border }]}>
+              <LinearGradient colors={formTheme.gloss} style={styles.themedFormGloss} />
+              <View style={[styles.themedFormBlob, styles.themedFormBlobTopLeft, { backgroundColor: `${formTheme.accent}10` }]}>
+                <Ionicons name="heart-outline" size={58} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={[styles.themedFormBlob, styles.themedFormBlobBottomRight, { backgroundColor: `${formTheme.accent}14` }]}>
+                <Ionicons name="sparkles-outline" size={64} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={styles.themedFormContent}>
+                <Text style={styles.questionText}>{question.text}</Text>
+                <View style={styles.answersContainer}>
+                  {question.answers.map((answer) => (
+                    <TouchableOpacity key={answer.id} onPress={() => handleAnswer(answer.id)} activeOpacity={0.8}>
+                      <GlassCard style={[styles.answerCard, selectedAnswer === answer.id && styles.answerCardSelected]} gradient={selectedAnswer === answer.id}>
+                        <Text style={[styles.answerText, selectedAnswer === answer.id && styles.answerTextSelected]}>{answer.text}</Text>
+                        {selectedAnswer === answer.id && <Ionicons name="checkmark" size={20} color={colors.accent_rose} />}
+                      </GlassCard>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <GradientButton
+                  label={currentQuestion < LOVE_LANGUAGE_QUESTIONS.length - 1 ? 'Next' : 'See Results'}
+                  onPress={handleNext}
+                  disabled={!selectedAnswer}
+                  style={styles.nextBtn}
+                />
+              </View>
+            </GlassCard>
           </ScrollView>
         </View>
       </ScreenBackground>
@@ -646,6 +722,7 @@ export default function TestsScreen() {
     const question = lqQuestions[lqCurrentQ];
     const choices = LQ_ANSWER_CHOICES[question.type];
     const progress = (lqCurrentQ / lqQuestions.length) * 100;
+    const formTheme = getTestFormTheme('love-quiz', isDark);
     return (
       <ScreenBackground>
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -661,17 +738,28 @@ export default function TestsScreen() {
           </View>
           <View style={styles.progressContainer}><ProgressBar progress={progress / 100} /></View>
           <ScrollView contentContainerStyle={styles.quizContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.questionText}>{question.text}</Text>
-            <View style={styles.answersContainer}>
-              {choices.map((choice, i) => (
-                <TouchableOpacity key={i} onPress={() => handleLQAnswer(i + 1)} activeOpacity={0.8}>
-                  <GlassCard style={styles.answerCard}>
-                    <Text style={styles.answerText}>{choice}</Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.text_muted} />
-                  </GlassCard>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <GlassCard style={[styles.themedFormCard, { backgroundColor: formTheme.fill, borderColor: formTheme.border }]}>
+              <LinearGradient colors={formTheme.gloss} style={styles.themedFormGloss} />
+              <View style={[styles.themedFormBlob, styles.themedFormBlobTopLeft, { backgroundColor: `${formTheme.accent}10` }]}>
+                <Ionicons name="heart-circle-outline" size={58} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={[styles.themedFormBlob, styles.themedFormBlobBottomRight, { backgroundColor: `${formTheme.accent}14` }]}>
+                <Ionicons name="chatbubbles-outline" size={64} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={styles.themedFormContent}>
+                <Text style={styles.questionText}>{question.text}</Text>
+                <View style={styles.answersContainer}>
+                  {choices.map((choice, i) => (
+                    <TouchableOpacity key={i} onPress={() => handleLQAnswer(i + 1)} activeOpacity={0.8}>
+                      <GlassCard style={styles.answerCard}>
+                        <Text style={styles.answerText}>{choice}</Text>
+                        <Ionicons name="chevron-forward" size={16} color={formTheme.accent} />
+                      </GlassCard>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </GlassCard>
           </ScrollView>
         </View>
       </ScreenBackground>
@@ -686,6 +774,7 @@ export default function TestsScreen() {
     const isLoveScore = calculatorType === 'love-score';
     const isNumerology = calculatorType === 'numerology';
     const isSoulmate = calculatorType === 'soulmate';
+    const formTheme = getTestFormTheme(calculatorType, isDark);
 
     const isLoveQuiz = calculatorType === 'love-quiz';
     const canSubmit = isBirthdate
@@ -710,6 +799,15 @@ export default function TestsScreen() {
             <Text style={styles.quizProgress}>{activeCalcTest.title.toUpperCase()}</Text>
           </View>
           <ScrollView contentContainerStyle={styles.calcContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <GlassCard style={[styles.themedFormCard, { backgroundColor: formTheme.fill, borderColor: formTheme.border }]}>
+              <LinearGradient colors={formTheme.gloss} style={styles.themedFormGloss} />
+              <View style={[styles.themedFormBlob, styles.themedFormBlobTopLeft, { backgroundColor: `${formTheme.accent}10` }]}>
+                <Ionicons name={activeCalcTest.icon as any} size={58} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={[styles.themedFormBlob, styles.themedFormBlobBottomRight, { backgroundColor: `${formTheme.accent}14` }]}>
+                <Ionicons name={activeCalcTest.icon as any} size={64} color={formTheme.accent} style={styles.themedFormBgIcon} />
+              </View>
+              <View style={styles.themedFormContent}>
             <Text style={styles.calcTitle}>{activeCalcTest.title}</Text>
             <Text style={styles.calcSub}>{activeCalcTest.description}</Text>
 
@@ -771,6 +869,8 @@ export default function TestsScreen() {
               onPress={handleCalcSubmit}
               disabled={!canSubmit || calcLoading}
             />
+              </View>
+            </GlassCard>
           </ScrollView>
         </View>
       </ScreenBackground>

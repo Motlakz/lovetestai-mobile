@@ -84,7 +84,7 @@ function createStyles(c: ThemeColors) {
     profileName: { fontSize: fontSizes.lg, color: c.text_primary, fontWeight: '700' as const },
     profileStatus: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const },
     profileDob: { fontSize: fontSizes.xs, color: c.text_muted },
-    editIconBtn: { position: 'absolute' as const, top: spacing.md, right: spacing.md, padding: spacing.xs, borderRadius: radius.full, backgroundColor: c.glass_fill, borderWidth: 1, borderColor: c.glass_border, zIndex: 2 },
+    editIconBtn: { position: 'absolute' as const, top: spacing.md, right: spacing.md, padding: spacing.sm, borderRadius: radius.full, backgroundColor: c.glass_fill, borderWidth: 1, borderColor: c.glass_border, zIndex: 2 },
     statsRow: { flexDirection: 'row' as const, gap: spacing.md, marginBottom: spacing.xl },
     statCard: { flex: 1, padding: spacing.lg, alignItems: 'center' as const, gap: spacing.xs },
     statNumber: { fontSize: fontSizes.xl, color: c.text_gold, fontWeight: '700' as const },
@@ -762,7 +762,7 @@ export default function ProfileScreen() {
               accessibilityLabel="Edit profile"
               hitSlop={8}
             >
-              <Ionicons name="create-outline" size={18} color={colors.text_secondary} />
+              <Text style={{ color: colors.text_secondary }}>Edit <Ionicons name="create-outline" size={18} color={colors.text_secondary} /></Text>
             </TouchableOpacity>
             <View style={styles.avatarContainer}>
               <LinearGradient
