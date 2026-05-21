@@ -20,6 +20,23 @@
     }
   },
   "submit": {
-    "production": {}
+    "internal": {
+      "android": {
+        "applicationId": "com.lovetestai",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    },
+    "production": {
+      "android": {
+        "applicationId": "com.lovetestai",
+        "track": "production",
+        "releaseStatus": "completed",
+        "changesNotSentForReview": true
+      },
+      "ios": {
+        "bundleIdentifier": "com.lovetestai"
+      }
+    }
   }
 }
