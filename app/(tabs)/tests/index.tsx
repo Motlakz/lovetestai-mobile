@@ -51,25 +51,118 @@ const ZODIAC_SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Li
 const RELATIONSHIP_STATUSES = ['Single (Crushing)', 'Dating', 'In a Relationship', 'Engaged', 'Married'];
 const LOVE_LANGUAGES = ['Words of Affirmation', 'Physical Touch', 'Quality Time', 'Receiving Gifts', 'Acts of Service'];
 const INTEREST_OPTIONS = ['Travel', 'Music', 'Art', 'Fitness', 'Cooking', 'Reading', 'Nature', 'Film', 'Creativity', 'Adventure'];
+const RESULT_MIN_LOADING_MS = 1800;
 
-function createStyles(c: ThemeColors, s: ThemeShadows) {
+function waitForMinimumDuration(startedAt: number): Promise<void> {
+  const remaining = RESULT_MIN_LOADING_MS - (Date.now() - startedAt);
+  return remaining > 0 ? new Promise(resolve => setTimeout(resolve, remaining)) : Promise.resolve();
+}
+
+function createStyles(c: ThemeColors, s: ThemeShadows, isDark: boolean) {
+  const acrylicFill = isDark ? 'rgba(18, 10, 28, 0.88)' : 'rgba(255, 250, 253, 0.92)';
+  const acrylicInset = isDark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.86)';
+  const neonBorder = isDark ? 'rgba(255,61,127,0.34)' : 'rgba(232,54,111,0.24)';
+  const cardShadowOpacity = isDark ? 0.62 : 0.12;
+  const luxuryTitle = isDark ? '#FFF5FB' : c.text_primary;
+  const luxuryBody = isDark ? 'rgba(255,232,246,0.72)' : c.text_secondary;
+  const luxuryMeta = isDark ? 'rgba(255,232,246,0.74)' : c.text_muted;
+
   return StyleSheet.create({
     container: { flex: 1 },
     header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
     headerTitle: { fontSize: fontSizes['2xl'], color: c.text_primary, fontWeight: '700' as const, letterSpacing: -0.5 },
     headerSub: { fontSize: fontSizes.sm, color: c.text_secondary, fontStyle: 'italic' as const, marginTop: spacing.xs },
     listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-    featuredCard: { padding: spacing.xl, marginBottom: spacing.lg, minHeight: 130, justifyContent: 'center' as const, gap: spacing.sm },
-    featuredTitle: { fontSize: fontSizes.xl, color: c.text_primary, fontWeight: '700' as const },
-    featuredDetail: { fontSize: fontSizes.sm, color: c.text_secondary },
+    featuredBorder: {
+      borderRadius: radius.xl + 2,
+      padding: 1.2,
+      marginBottom: spacing.lg,
+      shadowColor: '#FF3DCE',
+      shadowOpacity: isDark ? 0.30 : 0.18,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 10,
+    },
+    featuredCard: {
+      padding: spacing.xl,
+      minHeight: 142,
+      justifyContent: 'center' as const,
+      gap: spacing.sm,
+      backgroundColor: acrylicFill,
+      borderColor: acrylicInset,
+      shadowColor: '#000000',
+      shadowOpacity: cardShadowOpacity,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 14 },
+      elevation: 12,
+    },
+    featuredTitle: { fontSize: fontSizes.xl, color: luxuryTitle, fontWeight: '700' as const, letterSpacing: 0 },
+    featuredDetail: { fontSize: fontSizes.sm, color: luxuryMeta },
     featuredCta: { alignSelf: 'flex-start' as const, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
-    testCard: { padding: 0, flexDirection: 'row' as const, alignItems: 'stretch' as const, marginBottom: spacing.md, minHeight: 124, overflow: 'hidden' as const },
-    testCardStrip: { width: 68, alignItems: 'center' as const, justifyContent: 'center' as const, gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: 4 },
-    testStripDuration: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' as const, letterSpacing: 1 },
+    testCardFrame: {
+      marginBottom: spacing.md,
+      borderRadius: radius.xl + 2,
+      shadowColor: '#D946EF',
+      shadowOpacity: isDark ? 0.28 : 0.18,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 10,
+    },
+    testCardBorder: {
+      borderRadius: radius.xl + 2,
+      padding: 1.2,
+    },
+    testCard: {
+      padding: 0,
+      flexDirection: 'row' as const,
+      alignItems: 'stretch' as const,
+      minHeight: 132,
+      overflow: 'hidden' as const,
+      backgroundColor: acrylicFill,
+      borderColor: neonBorder,
+      shadowColor: '#000000',
+      shadowOpacity: cardShadowOpacity,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 14 },
+      elevation: 12,
+    },
+    testCardAura: {
+      position: 'absolute' as const,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      top: -58,
+      right: -32,
+      opacity: isDark ? 0.26 : 0.34,
+    },
+    testCardStrip: {
+      width: 78,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      borderRightWidth: 1,
+      borderRightColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(232,54,111,0.10)',
+    },
+    testIconPanel: {
+      width: 48,
+      height: 48,
+      borderRadius: 18,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.22)',
+      shadowColor: '#FF3DCE',
+      shadowOpacity: 0.32,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    testStripDuration: { fontSize: 9, color: isDark ? 'rgba(255,255,255,0.82)' : c.text_muted, fontWeight: '700' as const, letterSpacing: 1 },
     testCardBody: { flex: 1, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.xs },
     testCardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: spacing.sm },
-    testCardTitle: { fontSize: fontSizes.md, color: c.text_primary, fontWeight: '700' as const, flex: 1 },
-    testCardDesc: { fontSize: fontSizes.sm, color: c.text_secondary, lineHeight: 18 },
+    testCardTitle: { fontSize: fontSizes.md, color: luxuryTitle, fontWeight: '700' as const, flex: 1, letterSpacing: 0 },
+    testCardDesc: { fontSize: fontSizes.sm, color: luxuryBody, lineHeight: 18 },
     testCardCta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.xs, alignSelf: 'flex-end' as const, marginTop: 'auto' as const },
     testCardCtaText: { fontSize: fontSizes.xs, fontWeight: '700' as const, letterSpacing: 0.8, textTransform: 'uppercase' as const },
     completedBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
@@ -120,8 +213,8 @@ function createStyles(c: ThemeColors, s: ThemeShadows) {
 export default function TestsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { colors, shadows } = useTheme();
-  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+  const { colors, shadows, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, shadows, isDark), [colors, shadows, isDark]);
   const { incrementTests, profile, saveCreation } = useApp();
   const toast = useToast();
   const account = useAuthStore((s) => s.account);
@@ -155,7 +248,6 @@ export default function TestsScreen() {
 
   const startLLQuiz = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    void playUiSound('next');
     setCurrentQuestion(0);
     setAnswers({});
     setSelectedAnswer('');
@@ -165,7 +257,6 @@ export default function TestsScreen() {
 
   const startCalculator = useCallback((test: CalculatorTest) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    void playUiSound('next');
     setActiveCalcTest(test);
     setCalcInput1('');
     setCalcInput2('');
@@ -217,6 +308,7 @@ export default function TestsScreen() {
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     void playUiSound('submit');
+    const startedAt = Date.now();
     setCalcLoading(true);
     try {
       let resultScore: number | null = null;
@@ -246,6 +338,7 @@ export default function TestsScreen() {
         });
         setCalcResult({ text: `${data.analysis}\n\n${data.traits.map(t => `• ${t}`).join('\n')}` });
       }
+      await waitForMinimumDuration(startedAt);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       playScoreSound(resultScore);
       setScreenState('calc-result');
@@ -388,17 +481,17 @@ export default function TestsScreen() {
     }
   }, [llResult, toast]);
 
-  const getTestTheme = useCallback((type: string): { gradient: readonly [string, string, ...string[]]; accent: string } => {
+  const getTestTheme = useCallback((type: string): { gradient: readonly [string, string, ...string[]]; accent: string; glow: readonly [string, string, ...string[]] } => {
     switch (type) {
-      case 'zodiac':     return { gradient: ['#6366f1', '#8b5cf6'] as const, accent: '#818cf8' };
-      case 'birthdate':  return { gradient: ['#22c55e', '#14b8a6'] as const, accent: '#22c55e' };
-      case 'love-score': return { gradient: ['#f472b6', '#e8516a'] as const, accent: '#f472b6' };
-      case 'numerology': return { gradient: ['#facc15', '#1d4ed8'] as const, accent: '#facc15' };
-      case 'soulmate':   return { gradient: ['#fb7185', '#dc2626'] as const, accent: '#fb7185' };
-      case 'love-quiz':  return { gradient: ['#8b5cf6', '#ec4899', '#a855f7'] as const, accent: '#a855f7' };
-      default:           return { gradient: ['#f472b6', '#e8516a'] as const, accent: '#f472b6' };
+      case 'zodiac':     return { gradient: ['#6d5dfc', '#c026d3'] as const, accent: isDark ? '#c4b5fd' : '#6d28d9', glow: ['rgba(255,61,206,0.82)', 'rgba(109,93,252,0.30)', 'rgba(255,255,255,0.10)'] as const };
+      case 'birthdate':  return { gradient: ['#14b8a6', '#a855f7'] as const, accent: isDark ? '#5eead4' : '#0f766e', glow: ['rgba(20,184,166,0.62)', 'rgba(168,85,247,0.32)', 'rgba(255,61,127,0.26)'] as const };
+      case 'love-score': return { gradient: ['#ff3d7f', '#a855f7'] as const, accent: isDark ? '#ff8ec3' : '#be185d', glow: ['rgba(255,61,127,0.84)', 'rgba(168,85,247,0.34)', 'rgba(255,255,255,0.10)'] as const };
+      case 'numerology': return { gradient: ['#facc15', '#a855f7'] as const, accent: isDark ? '#fde68a' : '#8a5a00', glow: ['rgba(250,204,21,0.58)', 'rgba(168,85,247,0.36)', 'rgba(255,61,127,0.22)'] as const };
+      case 'soulmate':   return { gradient: ['#fb7185', '#db2777'] as const, accent: isDark ? '#fda4af' : '#be123c', glow: ['rgba(251,113,133,0.78)', 'rgba(219,39,119,0.36)', 'rgba(168,85,247,0.24)'] as const };
+      case 'love-quiz':  return { gradient: ['#8b5cf6', '#ec4899', '#a855f7'] as const, accent: isDark ? '#f0abfc' : '#9333ea', glow: ['rgba(236,72,153,0.82)', 'rgba(139,92,246,0.34)', 'rgba(255,255,255,0.10)'] as const };
+      default:           return { gradient: ['#ff3d7f', '#a855f7'] as const, accent: isDark ? '#ff8ec3' : '#be185d', glow: ['rgba(255,61,127,0.82)', 'rgba(168,85,247,0.34)', 'rgba(255,255,255,0.10)'] as const };
     }
-  }, []);
+  }, [isDark]);
 
   const handleLQAnswer = useCallback(async (score: number) => {
     void Haptics.selectionAsync();
@@ -414,24 +507,28 @@ export default function TestsScreen() {
       setTimeout(() => { void playUiSound('submit'); }, 180);
       const total = newAnswers.reduce((s, c) => s + c, 0);
       const finalScore = Math.round((total / (lqQuestions.length * 5)) * 100);
+      const startedAt = Date.now();
       setCalcLoading(true);
+      let completed = false;
       try {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const data = await analyzeLoveCompatibility(calcInput1, calcInput2, calcInput3, calcInput4, finalScore);
         setCalcResult({ score: data.adjustedScore, text: data.result });
+        await waitForMinimumDuration(startedAt);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         playScoreSound(data.adjustedScore);
         incrementTests();
+        completed = true;
       } catch {
-        setCalcResult({ score: finalScore, text: 'Could not get a reading right now. Your score reflects the quiz answers directly.' });
-        playScoreSound(finalScore);
-        incrementTests();
+        toast.error('Could not connect. Check your connection and try again.');
       } finally {
         setCalcLoading(false);
-        setScreenState('calc-result');
-        showCompletionPlacement('test_completed_love_quiz');
+        if (completed) {
+          setScreenState('calc-result');
+          showCompletionPlacement('test_completed_love_quiz');
+        }
       }
     }
-  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests]);
+  }, [lqAnswers, lqCurrentQ, lqQuestions, lqCompatibility, calcInput1, calcInput2, calcInput3, calcInput4, incrementTests, toast]);
 
   // ── Quiz screen ──────────────────────────────────────────────────────────────
   if (screenState === 'quiz') {
@@ -739,7 +836,15 @@ export default function TestsScreen() {
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
           <TouchableOpacity onPress={startLLQuiz} activeOpacity={0.9}>
-            <GlassCard style={styles.featuredCard}>
+            <LinearGradient
+              colors={isDark
+                ? ['rgba(255,61,127,0.78)', 'rgba(168,85,247,0.50)', 'rgba(255,255,255,0.12)']
+                : ['rgba(232,54,111,0.38)', 'rgba(142,36,170,0.20)', 'rgba(255,255,255,0.86)']}
+              style={styles.featuredBorder}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <GlassCard style={styles.featuredCard}>
               <GoldBadge label="MOST POPULAR" />
               <Text style={styles.featuredTitle}>{llEntry.title}</Text>
               <Text style={styles.featuredDetail}>5 languages · {llEntry.duration} · Free</Text>
@@ -750,16 +855,31 @@ export default function TestsScreen() {
                 </View>
               )}
               <GhostButton label="Take Test" onPress={startLLQuiz} style={styles.featuredCta} />
-            </GlassCard>
+              </GlassCard>
+            </LinearGradient>
           </TouchableOpacity>
 
           {calcTests.map((test) => {
             const theme = getTestTheme(test.calculatorType);
             return (
-              <TouchableOpacity key={test.id} onPress={() => startCalculator(test)} activeOpacity={0.9}>
-                <GlassCard style={styles.testCard}>
-                  <LinearGradient colors={theme.gradient} style={styles.testCardStrip} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}>
-                    <Ionicons name={test.icon as any} size={26} color="#FFFFFF" />
+              <TouchableOpacity key={test.id} onPress={() => startCalculator(test)} activeOpacity={0.9} style={styles.testCardFrame}>
+                <LinearGradient colors={theme.glow} style={styles.testCardBorder} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <GlassCard style={styles.testCard}>
+                  <LinearGradient
+                    colors={isDark ? [`${theme.accent}44`, 'rgba(168,85,247,0.00)'] : [`${theme.accent}24`, 'rgba(255,255,255,0.00)']}
+                    style={styles.testCardAura}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                  />
+                  <LinearGradient
+                    colors={isDark ? ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.035)'] : ['rgba(255,255,255,0.78)', 'rgba(255,240,248,0.42)']}
+                    style={styles.testCardStrip}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <LinearGradient colors={theme.gradient} style={styles.testIconPanel} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                      <Ionicons name={test.icon as any} size={24} color="#FFFFFF" />
+                    </LinearGradient>
                     <Text style={styles.testStripDuration}>{test.duration.toUpperCase()}</Text>
                   </LinearGradient>
                   <View style={styles.testCardBody}>
@@ -772,7 +892,8 @@ export default function TestsScreen() {
                       <Ionicons name="arrow-forward" size={14} color={theme.accent} />
                     </View>
                   </View>
-                </GlassCard>
+                  </GlassCard>
+                </LinearGradient>
               </TouchableOpacity>
             );
           })}

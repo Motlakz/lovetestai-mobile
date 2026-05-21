@@ -13,6 +13,9 @@ const PLATFORM_API_BASE =
 const ENABLE_LOCAL_CONTENT_FALLBACK =
   process.env.EXPO_PUBLIC_ENABLE_LOCAL_AI_FALLBACK === 'true';
 
+const ENABLE_LOCAL_TEST_FALLBACK =
+  process.env.EXPO_PUBLIC_ENABLE_LOCAL_TEST_FALLBACK === 'true';
+
 const CONTENT_ROUTES: Partial<Record<string, string>> = {
   'love-letter': '/api/generate-letter',
   'love-note': '/api/generate-note',
@@ -298,8 +301,13 @@ export async function analyzeLoveCompatibility(
     });
     trackGeneratorCompleted('love-quiz', 'platform');
     return { result: data.result, adjustedScore: data.adjustedScore ?? score };
-  } catch {
+  } catch (error) {
     trackError('analyze_compatibility', 'platform_failed_local_fallback');
+    console.log('[AI] analyze compatibility failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return quizLocal(loveLanguage1, loveLanguage2, score);
   }
 }
@@ -315,8 +323,13 @@ export async function calculateLoveScore(
     const result = await postJson<{ score: number; insight: string; message: string }>('/api/calculate-love', { name1, name2, relationshipStatus, duration, recaptchaToken });
     trackGeneratorCompleted('love-score', 'platform');
     return result;
-  } catch {
+  } catch (error) {
     trackError('calculate_love_score', 'platform_failed_local_fallback');
+    console.log('[AI] calculate love score failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return loveScoreLocal(name1, name2, relationshipStatus, duration);
   }
 }
@@ -330,8 +343,13 @@ export async function calculateZodiacCompatibility(
     const result = await postJson<{ score: number; analysis: string }>('/api/zodiac-compatibility', { sign1, sign2, recaptchaToken });
     trackGeneratorCompleted('zodiac', 'platform');
     return result;
-  } catch {
+  } catch (error) {
     trackError('zodiac_compatibility', 'platform_failed_local_fallback');
+    console.log('[AI] zodiac compatibility failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return zodiacLocal(sign1, sign2);
   }
 }
@@ -345,8 +363,13 @@ export async function calculateBirthdateCompatibility(
     const result = await postJson<{ score: number; analysis: string }>('/api/birthdate-compatibility', { date1, date2, recaptchaToken });
     trackGeneratorCompleted('birthdate', 'platform');
     return result;
-  } catch {
+  } catch (error) {
     trackError('birthdate_compatibility', 'platform_failed_local_fallback');
+    console.log('[AI] birthdate compatibility failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return birthdateLocal(date1, date2);
   }
 }
@@ -362,8 +385,13 @@ export async function calculateNumerology(
     const result = await postJson<{ score: number; analysis: string }>('/api/numerology', { name1, name2, date1, date2, recaptchaToken });
     trackGeneratorCompleted('numerology', 'platform');
     return result;
-  } catch {
+  } catch (error) {
     trackError('numerology', 'platform_failed_local_fallback');
+    console.log('[AI] numerology failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return numerologyLocal(name1, name2, date1, date2);
   }
 }
@@ -380,8 +408,13 @@ export async function findSoulmate(data: {
     const result = await postJson<{ analysis: string; traits: string[] }>('/api/soulmate-finder', data);
     trackGeneratorCompleted('soulmate', 'platform');
     return result;
-  } catch {
+  } catch (error) {
     trackError('soulmate_finder', 'platform_failed_local_fallback');
+    console.log('[AI] soulmate finder failed:', error);
+    if (!ENABLE_LOCAL_TEST_FALLBACK) {
+      throw error;
+    }
+    await simulateDelay();
     return soulmateLocal(data.name, data.zodiacSign, data.interests, data.loveLanguage);
   }
 }

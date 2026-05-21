@@ -686,11 +686,6 @@ export default function ProfileScreen() {
     setNotifModalVisible(true);
   }, []);
 
-  const handleInAppNotificationPrefs = useCallback(() => {
-    void Haptics.selectionAsync();
-    setNotifModalVisible(true);
-  }, []);
-
   const handleSaveNotifPrefs = useCallback(async () => {
     try {
       await saveNotifPrefs({
@@ -910,8 +905,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           {renderSettingsRow('people-outline', 'Partner Prompts', handleTwoPlayerInfo)}
-          {renderSettingsRow('notifications-outline', 'Push Notifications', handlePushNotificationPrefs, pushNotifEnabled ? 'On' : 'Off')}
-          {renderSettingsRow('file-tray-full-outline', 'In-App Notifications', handleInAppNotificationPrefs, inAppNotifEnabled ? 'On' : 'Off')}
+          {renderSettingsRow('notifications-outline', 'Notifications', handlePushNotificationPrefs, remindersEnabled ? 'On' : 'Off')}
           {renderSettingsRow('language-outline', 'Language', handleLanguage, 'Soon')}
           {renderSettingsRow('star-outline', 'Rate Love Test AI', handleRateApp)}
           {renderSettingsRow('shield-outline', 'Privacy Policy', handlePrivacyPolicy)}
